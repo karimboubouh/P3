@@ -16,9 +16,10 @@ def collaborate(graph):
     # setup algorithm parameters
     for peer in graph.peers:
         peer.params.D = sum(peer.similarity.values())
-        peer.params.alpha = 0.9
+        peer.params.alpha = 0.99
         peer.params.c = calculate_c(peer)
         peer.params.models = {}
+        log("info", f"{peer}, D={peer.params.D}, alpha={peer.params.alpha}, C={peer.params.c}")
 
     # prepare tqdm
     log("info", f"Collaborative training for {graph.args.rounds} rounds")
@@ -35,14 +36,12 @@ def collaborate(graph):
         update_weights(peer)
         update_weights(neighbor)
         # evaluate all models every RECORD_RATE
-        if True or epoch % RECORD_RATE == 0:
+        if epoch % RECORD_RATE == 0:
             run_evaluation(graph, history)
             # rounds.set_postfix({**{'peer': peer}, **history[peer.id][-1]})
 
     for peer in graph.peers:
         print(peer, peer.model.evaluate(peer.test))
-
-    input("Press Enter to continue...")
 
     return history
 

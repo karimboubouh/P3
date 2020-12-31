@@ -5,12 +5,13 @@ import numpy as np
 from tqdm import tqdm
 
 from src.conf import RECORD_RATE
+from src.p2p import Graph
 from src.utils import log
 
-name = "Average-based Collaborative Learner"
+name = "Gradient Averaging Collaborative Learner"
 
 
-def collaborate(graph):
+def collaborate(graph: Graph):
     # initialize history holder
     history = dict.fromkeys(range(len(graph.peers)))
     for k in history.keys():
@@ -18,30 +19,37 @@ def collaborate(graph):
 
     # setup algorithm parameters
     for peer in graph.peers:
-        peer.params.models = []
+        peer.params.gradients = []
 
     # prepare tqdm
     rounds = tqdm(range(graph.args.rounds))
     log("info", f"Collaborative training for {graph.args.rounds} rounds")
-    for epoch in rounds:
+    for epoch in range(graph.args.rounds):
         # Randomly activate a peer
         peer = np.random.choice(graph.peers)
         if peer.clustered:
             # exchange with peer's cluster
-            peer.params.models = []
+            peer.params.gradients = []
             for neighbor in peer.neighbors:
-                peer.params.models.append(neighbor.model)
+                # Todo run in parallel
+                # run one training epoch per neighbor
+                ngrads = neighbor.train_one_epoch()
+                peer.params.gradients.append(ngrads)
             # Update model
             average_weights(peer)
         else:
             # Randomly select a neighbor
             neighbor = np.random.choice(peer.neighbors)
-            # Exchange models
-            peer.params.models = [neighbor.model]
-            neighbor.params.models = [peer.model]
-            # Update models
-            average_weights(peer)
-            average_weights(neighbor)
+            # run one training epoch
+            # Todo run in parallel
+            peer.train_one_epoch()
+            neighbor.train_one_epoch()
+            # Exchange gradients
+            peer.params.gradients = [neighbor.get_gradients()]
+            neighbor.params.gradients = [peer.get_gradients()]
+            # average grads an take a step
+            avg_step(peer)
+            avg_step(neighbor)
 
         # Evaluate all models every RECORD_RATE
         if epoch % RECORD_RATE == 0:
@@ -52,6 +60,17 @@ def collaborate(graph):
         print(peer, peer.model.evaluate(peer.test))
 
     return history
+
+
+def avg_step(peer):
+    average_grads = average_gradients(peer)
+    peer.set_gradients(average_grads)
+    peer.take_step()
+
+
+def average_gradients(peer):
+    grads = [peer.get_gradients()] + peer.params.gradients
+    return torch.mean(torch.stack(grads), dim=0)
 
 
 def average_weights(peer):

@@ -6,7 +6,7 @@ from src.p2p import Node, Graph
 from src.utils import cluster_peers, similarity_matrix, node_info, inference_ds, log
 
 
-def random_graph(models, cluster_enabled=True, k=5, sigma=0.2):
+def random_graph(models, sigma=0.2, cluster_enabled=False, k=2):
     if sigma and sigma < 0:
         log('warning', f"Generating a negative similarity matrix.")
     # prob_edge = 1, rnd_state = None

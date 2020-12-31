@@ -16,38 +16,48 @@ import torch.nn.functional as F
 from src.utils import log
 
 
-def build_models(args):
-    # BUILD NODES MODELS
+def initialize_models(args, same=False):
+    # INITIALIZE PEERS MODELS
     models = []
-    # TEST
-    len_in = 28 * 28
-    model = FFNMnist(dim_in=len_in, dim_out=args.num_classes)
-    for i in range(args.num_users):
-        models.append(copy.deepcopy(model))
-    x= models
-    # END TEST
+    modelClass = None
+    if args.model == 'cnn':
+        # Convolutional neural network
+        if args.dataset == 'mnist':
+            modelClass = CNNMnist
+        elif args.dataset == 'fmnist':
+            modelClass = CNNFashion_Mnist
+        elif args.dataset == 'cifar':
+            modelClass = CNNCifar
+    elif args.model == 'mlp':
+        # Multi-layer perceptron
+        modelClass = FFNMnist
+        # modelClass = MLP
+        # modelClass = LogisticRegression
+    else:
+        exit('Error: unrecognized model')
 
-    # TODO try starting with the same model.
-
-    models = []
-    for i in range(args.num_users):
+    if same:
+        # Initialize all models with same weights
         model = None
         if args.model == 'cnn':
-            # Convolutional neural network
-            if args.dataset == 'mnist':
-                model = CNNMnist(args=args)
-            elif args.dataset == 'fmnist':
-                model = CNNFashion_Mnist(args=args)
-            elif args.dataset == 'cifar':
-                model = CNNCifar(args=args)
-        elif args.model == 'mlp':
-            # Multi-layer perceptron
-            len_in = 28 * 28
-            # model = MLP(dim_in=len_in, dim_hidden=512, dim_out=args.num_classes)
-            model = FFNMnist(dim_in=len_in, dim_out=args.num_classes)
+            model = modelClass(args=args)
         else:
-            exit('Error: unrecognized model')
-        models.append(model)
+            len_in = 28 * 28
+            model = modelClass(dim_in=len_in, dim_out=args.num_classes)
+        for i in range(args.num_users):
+            models.append(copy.deepcopy(model))
+        return models
+
+    else:
+        # Independent initialization
+        for i in range(args.num_users):
+            model = None
+            if args.model == 'cnn':
+                model = modelClass(args=args)
+            else:
+                len_in = 28 * 28
+                model = modelClass(dim_in=len_in, dim_out=args.num_classes)
+            models.append(model)
 
     return models
 
@@ -56,6 +66,9 @@ def build_models(args):
 
 class ModelBase(nn.Module):
     """Shared methods between models"""
+
+    def __init__(self):
+        super().__init__()
 
     def forward(self, xb):
         # Flatten the image tensors and do a forward pass
@@ -116,9 +129,23 @@ class FFNMnist(ModelBase):
         return self.network(xb)
 
 
+class LogisticRegression(ModelBase):
+    def __init__(self, dim_in, dim_out):
+        super(LogisticRegression, self).__init__()
+
+        self.linear = torch.nn.Linear(dim_in, dim_out)
+
+    def forward(self, x):
+        # Flatten the image tensors and do a forward pass
+        x = x.view(x.size(0), -1)
+        outputs = self.linear(x)
+        return outputs
+
+
 class MLP(ModelBase):
-    def __init__(self, dim_in, dim_hidden, dim_out):
+    def __init__(self, dim_in, dim_out):
         super(MLP, self).__init__()
+        dim_hidden = 32
         self.layer_input = nn.Linear(dim_in, dim_hidden)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout()

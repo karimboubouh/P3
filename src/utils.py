@@ -17,29 +17,26 @@ args: argparse.Namespace = None
 def set_device(args):
     """Pick GPU if available, else CPU"""
     if torch.cuda.is_available() and args.gpu:
-        print('Using GPU')
+        print('    Device             : Cuda')
         return torch.device('cuda')
     else:
-        print('Using CPU')
+        print('    Device             : CPU')
         return torch.device('cpu')
 
 
 def exp_details(args):
-    print('\nExperimental details:')
-    print(f'    Model     : {args.model}')
-    print(f'    Optimizer : {args.optimizer}')
-    print(f'    Learning  : {args.lr}')
-    print(f'    Rounds   : {args.rounds}\n')
-
-    print('    Collaborative learning parameters:')
-    if args.iid:
-        print('    IID')
-    else:
-        print('    Non-IID')
-    # print(f'    Fraction of users  : {args.frac}')
+    print('Experimental details:')
+    print(f'    Model      : {args.model.upper()}')
+    print(f'    Optimizer  : {args.optimizer}')
+    print(f'    Learning   : {args.lr}')
+    print(f'    Epochs     : {args.epochs}')
+    print(f'    Batch size : {args.batch_size}')
+    print(f'    Device : Using {torch.device}')
+    print('Collaborative learning parameters:')
+    iid = 'IID' if args.iid else 'Non-IID'
+    print(f'    Data distribution  : {iid}')
     print(f'    Number of peers    : {args.num_users}')
-    print(f'    Local Batch size   : {args.local_bs}')
-    print(f'    Epochs             : {args.epochs}\n')
+    print(f'    Rounds             : {args.rounds}')
 
     return
 
@@ -279,11 +276,9 @@ def train_val_test(train_ds, mask, args, ratio=None):
         val_bach_size = 1
     # create data loaders
     train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True,
-                              num_workers=8, pin_memory=True)
-    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=val_bach_size, shuffle=False, num_workers=8,
-                            pin_memory=True)
-    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=val_bach_size, shuffle=False, num_workers=8,
-                             pin_memory=True)
+                              num_workers=4, pin_memory=True)
+    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=val_bach_size, shuffle=False)
+    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=val_bach_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
 

@@ -1,8 +1,8 @@
 import time
+from copy import deepcopy
 from typing import List
 
 import torch
-from termcolor import cprint
 
 from src.helpers import Map
 from src.utils import optimizer_func, log
@@ -14,6 +14,8 @@ class Node:
         self.id = k
         self.model = model
         self.local_model = model
+        self.optimizer = None
+        self.grads = None
         self.neighbors = neighbors
         self.clustered = clustered
         self.similarity = similarity
@@ -36,14 +38,14 @@ class Node:
 
     def fit(self):
         history = []
-        optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
+        self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
         for epoch in range(self.params.epochs):
             for batch in self.train:
                 # Train Phase
                 loss = self.model.train_step(batch)
                 loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
             # Validation Phase
             result = self.model.evaluate(self.val)
             self.model.epoch_end(epoch, result)
@@ -51,6 +53,26 @@ class Node:
             # set local model variable
             self.local_model = self.model
         return history
+
+    def train_one_epoch(self, random=False, evaluate=False):
+        """
+        Train the model on a random batch of the data
+        :return: None
+        """
+        # train for single batch
+        batch = next(iter(self.train))  # train for single batch
+        # execute one training step
+        self.optimizer.zero_grad()
+        loss = self.model.train_step(batch)
+        loss.backward()
+        self.optimizer.step()
+        # get gradients
+        grads = []
+        for param in self.model.parameters():
+            grads.append(param.grad.view(-1))
+        self.grads = torch.cat(deepcopy(grads))
+
+        return loss, grads
 
     def evaluate(self, dataloader):
         return self.model.evaluate(dataloader)
@@ -68,6 +90,30 @@ class Node:
 
     def reset_neighbors(self, nodes, similarity):
         pass
+
+    def get_weights(self):
+        return deepcopy(self.model.state_dict())
+
+    def set_weights(self, w):
+        self.model.load_state_dict(deepcopy(w))
+
+    def get_gradients(self):
+        return self.grads
+
+    def set_gradients(self, grads):
+        idx = 0
+        grads_ = grads.clone()
+        for param in self.model.parameters():
+            size_layer = len(param.grad.view(-1))
+            grads_layer = torch.Tensor(grads_[idx: idx + size_layer]).reshape_as(param.grad).detach()
+            param.grad = grads_layer
+            idx += size_layer
+        self.grads = grads_
+
+    def take_step(self):
+        self.model.train()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
 
     #  Private methods --------------------------------------------------------
 
