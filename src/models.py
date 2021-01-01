@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from src.utils import log
 
 
-def initialize_models(args, same=False):
+def initialize_models(args, same=False, device='cpu'):
     # INITIALIZE PEERS MODELS
     models = []
     modelClass = None
@@ -59,6 +59,9 @@ def initialize_models(args, same=False):
                 model = modelClass(dim_in=len_in, dim_out=args.num_classes)
             models.append(model)
 
+    for model in models:
+        model.to(device)
+
     return models
 
 
@@ -75,17 +78,19 @@ class ModelBase(nn.Module):
         flatten = xb.view(xb.size(0), -1)
         return self.network(flatten)
 
-    def train_step(self, batch):
+    def train_step(self, batch, device='cpu'):
         # Generate predictions and calculate loss
         images, labels = batch
+        images, labels = images.to(device), labels.to(device)
         out = self(images)
-        loss = F.cross_entropy(out, labels)
+        loss = F.cross_entropy(out, labels).to(device)
         return loss
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, device='cpu'):
         images, labels = batch
+        images, labels = images.to(device), labels.to(device)
         out = self(images)
-        loss = F.cross_entropy(out, labels)
+        loss = F.cross_entropy(out, labels).to(device)
         acc = self.accuracy(out, labels)
         return {'val_loss': loss, 'val_acc': acc}
 
@@ -104,8 +109,8 @@ class ModelBase(nn.Module):
         _, preds = torch.max(outputs, dim=1)
         return torch.tensor(torch.sum(preds == labels).item() / len(preds))
 
-    def evaluate(self, val_loader):
-        outputs = [self.validation_step(batch) for batch in val_loader]
+    def evaluate(self, val_loader, device='cpu'):
+        outputs = [self.validation_step(batch, device) for batch in val_loader]
         return self.validation_epoch_end(outputs)
 
 

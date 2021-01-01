@@ -17,9 +17,8 @@ if __name__ == '__main__':
     start_time = time.time()
     # load experiment configuration from CLI arguments
     args = load_conf()
-    args.iid = 0
-    args.num_users = 20
-    args.epochs = 2
+    args.num_users = 10
+    args.epochs = 6
     args.rounds = 300
     # print experiment details
     exp_details(args)
@@ -28,26 +27,26 @@ if __name__ == '__main__':
     # load dataset and initialize user groups
     train_ds, test_ds, user_groups = get_dataset(args)
     # build users models
-    models = initialize_models(args, same=False)
+    models = initialize_models(args, same=False, device=device)
     # setup the network topology
-    topology = random_graph(models, sigma=0.2)
+    topology = random_graph(models, sigma=0.3)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args)
     graph.show_similarity()
     # graph.show_neighbors()
 
     # perform local training
-    train_logs = graph.local_training()
+    train_logs = graph.local_training(device=device)
 
     # plot the history of local training phase
     # info = {'xlabel': "Epochs", 'title': "Accuracy. vs. No. of epochs"}
     # plot_train_history(train_logs, metric='accuracy', measure="mean", info=info)
 
     for peer in graph.peers:
-        print(peer, peer.model.evaluate(peer.test))
+        print(peer, peer.model.evaluate(peer.test, device))
 
     # start collaborative training
-    collab_logs = graph.collaborative_training(learner=avgrad)
+    collab_logs = graph.collaborative_training(learner=avgrad,device=device)
 
     # plot the history of collaborative training phase
     info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}

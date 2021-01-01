@@ -31,7 +31,6 @@ def exp_details(args):
     print(f'    Learning   : {args.lr}')
     print(f'    Epochs     : {args.epochs}')
     print(f'    Batch size : {args.batch_size}')
-    print(f'    Device : Using {torch.device}')
     print('Collaborative learning parameters:')
     iid = 'IID' if args.iid else 'Non-IID'
     print(f'    Data distribution  : {iid}')
@@ -102,9 +101,9 @@ def args_parser():
 
 
 def load_conf():
-    sys.argv = ['']
-    args_parser()
+    # sys.argv = ['']
     global args
+    args = args_parser()
     return Map(vars(args))
 
 

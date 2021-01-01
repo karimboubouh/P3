@@ -36,25 +36,25 @@ class Node:
         if isinstance(params, Map):
             self.params = Map(dict(self.params, **params))
 
-    def fit(self):
+    def fit(self, device='cpu'):
         history = []
         self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
         for epoch in range(self.params.epochs):
             for batch in self.train:
                 # Train Phase
-                loss = self.model.train_step(batch)
+                loss = self.model.train_step(batch, device)
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
             # Validation Phase
-            result = self.model.evaluate(self.val)
+            result = self.model.evaluate(self.val, device)
             self.model.epoch_end(epoch, result)
             history.append(result)
             # set local model variable
             self.local_model = self.model
         return history
 
-    def train_one_epoch(self, random=False, evaluate=False):
+    def train_one_epoch(self, random=False, evaluate=False, device='cpu'):
         """
         Train the model on a random batch of the data
         :return: None
@@ -63,7 +63,7 @@ class Node:
         batch = next(iter(self.train))  # train for single batch
         # execute one training step
         self.optimizer.zero_grad()
-        loss = self.model.train_step(batch)
+        loss = self.model.train_step(batch, device)
         loss.backward()
         self.optimizer.step()
         # get gradients
@@ -138,13 +138,13 @@ class Graph:
         self.test_ds = test_ds
         self.args = args
 
-    def local_training(self):
+    def local_training(self, device='cpu'):
         t = time.time()
         log('event', 'Starting local training ...')
         histories = dict()
         for peer in self.peers:
             log('info', f"{peer} is performing local training ...")
-            histories[peer] = peer.fit()
+            histories[peer] = peer.fit(device)
         t = time.time() - t
         log("success", f"Local training finished in {t:.2f} seconds.")
 
@@ -167,10 +167,10 @@ class Graph:
 
         return history
 
-    def collaborative_training(self, learner):
+    def collaborative_training(self, learner, device):
         t = time.time()
         log('event', f'Starting collaborative training using {learner.name} ...')
-        collab_logs = learner.collaborate(self)
+        collab_logs = learner.collaborate(self, device)
         t = time.time() - t
         log("success", f"Collaborative training finished in {t:.2f} seconds.")
         return collab_logs

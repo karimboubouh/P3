@@ -11,7 +11,7 @@ from src.utils import log
 name = "Gradient Averaging Collaborative Learner"
 
 
-def collaborate(graph: Graph):
+def collaborate(graph: Graph, device='cpu'):
     # initialize history holder
     history = dict.fromkeys(range(len(graph.peers)))
     for k in history.keys():
@@ -33,7 +33,7 @@ def collaborate(graph: Graph):
             for neighbor in peer.neighbors:
                 # Todo run in parallel
                 # run one training epoch per neighbor
-                ngrads = neighbor.train_one_epoch()
+                ngrads = neighbor.train_one_epoch(device)
                 peer.params.gradients.append(ngrads)
             # Update model
             average_weights(peer)
@@ -42,8 +42,8 @@ def collaborate(graph: Graph):
             neighbor = np.random.choice(peer.neighbors)
             # run one training epoch
             # Todo run in parallel
-            peer.train_one_epoch()
-            neighbor.train_one_epoch()
+            peer.train_one_epoch(device)
+            neighbor.train_one_epoch(device)
             # Exchange gradients
             peer.params.gradients = [neighbor.get_gradients()]
             neighbor.params.gradients = [peer.get_gradients()]
