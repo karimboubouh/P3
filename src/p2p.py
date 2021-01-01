@@ -54,7 +54,7 @@ class Node:
             self.local_model = self.model
         return history
 
-    def train_one_epoch(self, random=False, evaluate=False, device='cpu'):
+    def train_one_epoch(self, device='cpu', random=False, evaluate=False):
         """
         Train the model on a random batch of the data
         :return: None
