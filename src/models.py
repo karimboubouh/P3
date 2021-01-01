@@ -109,8 +109,12 @@ class ModelBase(nn.Module):
         _, preds = torch.max(outputs, dim=1)
         return torch.tensor(torch.sum(preds == labels).item() / len(preds))
 
-    def evaluate(self, val_loader, device='cpu'):
-        outputs = [self.validation_step(batch, device) for batch in val_loader]
+    def evaluate(self, val_loader, device='cpu', one_batch=False):
+        if one_batch:
+            batch = next(iter(val_loader))
+            outputs = [self.validation_step(batch, device)]
+        else:
+            outputs = [self.validation_step(batch, device) for batch in val_loader]
         return self.validation_epoch_end(outputs)
 
 

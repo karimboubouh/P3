@@ -1,3 +1,4 @@
+import time
 from copy import deepcopy
 
 import torch
@@ -24,7 +25,7 @@ def collaborate(graph: Graph, device='cpu'):
     # prepare tqdm
     rounds = tqdm(range(graph.args.rounds))
     log("info", f"Collaborative training for {graph.args.rounds} rounds")
-    for epoch in range(graph.args.rounds):
+    for epoch in rounds:
         # Randomly activate a peer
         peer = np.random.choice(graph.peers)
         if peer.clustered:
@@ -91,9 +92,15 @@ def average_weights(peer):
 
 
 def run_evaluation(graph, history):
+    t = time.time()
+    current = []
     for peer in graph.peers:
-        r = peer.model.evaluate(peer.test)
+        r = peer.model.evaluate(peer.inference, one_batch=True)
         history[peer.id].append(r)
+        current.append(r)
+    current_los = np.mean([e['val_loss'] for e in current])
+    current_acc = np.mean([e['val_acc'] for e in current])
+    print(f"\nEvaluation done in {time.time() - t} with mean accuracy: {current_acc} and mean loss {current_los}.")
 
     return history
 

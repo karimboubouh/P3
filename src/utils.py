@@ -257,7 +257,7 @@ def train_val_test(train_ds, mask, args, ratio=None):
     Returns train, validation and test dataloaders for a given dataset
     and user indexes.
     """
-    ratio = [.8, .1, .1] if ratio is None else ratio
+    ratio = [.6, .2, .2] if ratio is None else ratio
     mask = list(mask)
     assert np.sum(ratio) == 1, "Ratio between train, dev and test must sum to 1."
     v1 = int(ratio[0] * len(mask))
@@ -266,24 +266,20 @@ def train_val_test(train_ds, mask, args, ratio=None):
     train_mask = mask[:v1]
     val_mask = mask[v1:v2]
     test_mask = mask[v2:]
-    # batch size of val and test
-    min_bach_size = 512
-    val_len = len(val_mask)
-    if val_len > min_bach_size:
-        val_bach_size = int(val_len / int(np.log(val_len)))
-    else:
-        val_bach_size = 1
     # create data loaders
     train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True,
-                              num_workers=4, pin_memory=True)
-    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=val_bach_size, shuffle=False)
-    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=val_bach_size, shuffle=False)
+                              num_workers=0, pin_memory=True)
+    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False, num_workers=0,
+                            pin_memory=True)
+    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=args.batch_size, shuffle=False,
+                             num_workers=0, pin_memory=True)
 
     return train_loader, val_loader, test_loader
 
 
 def inference_ds(test_ds, args):
-    global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    # global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    global_test = DataLoader(test_ds, batch_size=1000, shuffle=False, num_workers=8, pin_memory=True)
 
     return global_test
 

@@ -82,6 +82,10 @@ def mnist_noniid(dataset, num_users):
     """
     # 60,000 training imgs -->  200 imgs/shard X 300 shards
     num_shards, num_imgs = 200, 300
+    # for testing purposes
+    # todo Remove later
+    if num_users < 50:
+        num_shards, num_imgs = 100, 600
     idx_shard = [i for i in range(num_shards)]
     dict_users = {i: np.array([]) for i in range(num_users)}
     idxs = np.arange(num_shards * num_imgs)

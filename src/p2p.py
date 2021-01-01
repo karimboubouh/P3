@@ -143,7 +143,7 @@ class Graph:
         log('event', 'Starting local training ...')
         histories = dict()
         for peer in self.peers:
-            log('info', f"{peer} is performing local training ...")
+            log('info', f"{peer} is performing local training on {len(peer.train.dataset)} samples ...")
             histories[peer] = peer.fit(device)
         t = time.time() - t
         log("success", f"Local training finished in {t:.2f} seconds.")
@@ -195,10 +195,15 @@ class Graph:
                 s = {k: round(v, 2) for k, v in peer.similarity.items()}
                 log('', f"{peer}: {s}")
 
-    def show_neighbors(self):
+    def show_neighbors(self, verbose=False):
         log('info', "Neighbors list")
         for peer in self.peers:
-            log('', f"{peer}: {peer.neighbors}")
+            log('', f"{peer} has: {len(peer.neighbors)} neighbors.")
+            if verbose:
+                # log('', f"{peer} neighbors: {peer.neighbors}")
+                log('',
+                    f"{peer} has: {len(peer.train.dataset)} train samples / {len(peer.val.dataset)} validation samples "
+                    f"/ {len(peer.test.dataset)} test samples / {len(peer.inference.dataset)} inference samples")
 
     def __len__(self):
         return len(self.peers)
