@@ -30,9 +30,12 @@ def initialize_models(args, same=False, device='cpu'):
             modelClass = CNNCifar
     elif args.model == 'mlp':
         # Multi-layer perceptron
-        modelClass = FFNMnist
-        # modelClass = MLP
-        # modelClass = LogisticRegression
+        if args.dataset == 'mnist':
+            modelClass = FFNMnist
+        else:
+            modelClass = MLP
+    elif args.model == 'linear':
+        modelClass = LogisticRegression
     else:
         exit('Error: unrecognized model')
 
@@ -83,7 +86,10 @@ class ModelBase(nn.Module):
         images, labels = batch
         images, labels = images.to(device), labels.to(device)
         out = self(images)
-        loss = F.cross_entropy(out, labels).to(device)
+        # loss = F.cross_entropy(out, labels).to(device)
+        criterion = nn.CrossEntropyLoss()
+        criterion = criterion.to(device)
+        loss = criterion(out, labels)
         return loss
 
     def validation_step(self, batch, device='cpu'):

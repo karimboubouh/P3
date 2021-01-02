@@ -33,7 +33,7 @@ def collaborate(graph: Graph, device='cpu'):
             peer.params.gradients = []
             for neighbor in peer.neighbors:
                 # Todo run in parallel
-                # run one training epoch per neighbor
+                # run one8 training epoch per neighbor
                 ngrads = neighbor.train_one_epoch(device)
                 peer.params.gradients.append(ngrads)
             # Update model

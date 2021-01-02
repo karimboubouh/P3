@@ -9,6 +9,7 @@ from itertools import combinations
 from scipy.spatial import distance
 
 from src import conf
+from src.conf import TRAIN_VAL_TEST_RATIO
 from src.helpers import DatasetSplit, Map
 
 args: argparse.Namespace = None
@@ -33,7 +34,9 @@ def exp_details(args):
     print(f'    Batch size : {args.batch_size}')
     print('Collaborative learning parameters:')
     iid = 'IID' if args.iid else 'Non-IID'
+    size = 'Unequal' if args.enequal else 'Equal'
     print(f'    Data distribution  : {iid}')
+    print(f'    Data size          : {size} data size')
     print(f'    Number of peers    : {args.num_users}')
     print(f'    Rounds             : {args.rounds}')
 
@@ -160,10 +163,10 @@ def log(mtype, message):
     if args.verbose > 1:
         if mtype == "info":
             if title:
-                cprint(" Info:    ", 'grey', attrs=['reverse'], end=' ')
+                cprint(" Info:    ", attrs=['reverse'], end=' ')
             else:
-                cprint("          ", 'grey', end=' ')
-            cprint(message, 'grey')
+                cprint("          ", end=' ')
+            cprint(message)
             log.old_type = 'info'
             return
         else:
@@ -257,7 +260,7 @@ def train_val_test(train_ds, mask, args, ratio=None):
     Returns train, validation and test dataloaders for a given dataset
     and user indexes.
     """
-    ratio = [.6, .2, .2] if ratio is None else ratio
+    ratio = TRAIN_VAL_TEST_RATIO if ratio is None else ratio
     mask = list(mask)
     assert np.sum(ratio) == 1, "Ratio between train, dev and test must sum to 1."
     v1 = int(ratio[0] * len(mask))
@@ -317,3 +320,11 @@ def verify_metrics(_metric, _measure):
 def get_neighbors_by_ids(peers, ids):
     return
     return None
+
+
+def inference_eval(peer, device, one_batch=False):
+    r = peer.model.evaluate(peer.inference, device, one_batch)
+    o = "+" if one_batch else "*"
+    acc = round(r['val_acc'], 2) * 100
+    loss = round(r['val_loss'], 2)
+    log('result', f"{peer} achieved {o} Inference accuracy: {acc}% | Inference loss: {loss}")

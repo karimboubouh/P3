@@ -14,11 +14,12 @@ from src.utils import exp_details, set_device, log, load_conf
 
 if __name__ == '__main__':
     np.random.seed(0)
+    torch.set_num_threads(1)
     start_time = time.time()
     # load experiment configuration from CLI arguments
     args = load_conf()
     args.num_users = 10
-    args.epochs = 3
+    args.epochs = 10
     args.rounds = 400
     # print experiment details
     exp_details(args)
@@ -32,30 +33,30 @@ if __name__ == '__main__':
     topology = random_graph(models, sigma=0.2)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args)
-    graph.show_similarity()
+    # graph.show_similarity()
     # graph.show_neighbors(verbose=True)
 
     # perform local training
     train_logs = graph.local_training(device=device)
 
     # plot the history of local training phase
-    # info = {'xlabel': "Epochs", 'title': "Accuracy. vs. No. of epochs"}
-    # plot_train_history(train_logs, metric='accuracy', measure="mean", info=info)
+    info = {'xlabel': "Epochs", 'title': "Accuracy. vs. No. of epochs"}
+    plot_train_history(train_logs, metric='accuracy', measure="mean", info=info)
 
     # for peer in graph.peers:
     #     print(peer, peer.model.evaluate(peer.inference, device, one_batch=True))
     # print('======================')
 
     # start collaborative training
-    collab_logs = graph.collaborative_training(learner=avgrad,device=device)
+    # collab_logs = graph.collaborative_training(learner=avgrad, device=device)
 
-    for peer in graph.peers:
-        print(peer, peer.model.evaluate(peer.inference, device))
+    # for peer in graph.peers:
+    #     print(peer, peer.model.evaluate(peer.inference, device))
     print('======================')
 
     # plot the history of collaborative training phase
-    info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
-    plot_train_history(collab_logs, metric='accuracy', measure="mean")
+    # info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
+    # plot_train_history(collab_logs, metric='accuracy', measure="mean")
 
     # todo add title attributes
     # plot_train_history(collab_logs, metric='accuracy', measure="max")

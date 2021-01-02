@@ -5,7 +5,7 @@ from typing import List
 import torch
 
 from src.helpers import Map
-from src.utils import optimizer_func, log
+from src.utils import optimizer_func, log, inference_eval
 
 
 class Node:
@@ -50,8 +50,11 @@ class Node:
             result = self.model.evaluate(self.val, device)
             self.model.epoch_end(epoch, result)
             history.append(result)
-            # set local model variable
-            self.local_model = self.model
+        # evaluate against a batch of the inference dataset
+        inference_eval(self, device)
+        # todo beautify print
+        # set local model variable
+        self.local_model = self.model
         return history
 
     def train_one_epoch(self, device='cpu', random=False, evaluate=False):
