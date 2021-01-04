@@ -52,7 +52,6 @@ class Node:
             history.append(result)
         # evaluate against a batch of the inference dataset
         inference_eval(self, device)
-        # todo beautify print
         # set local model variable
         self.local_model = self.model
         return history

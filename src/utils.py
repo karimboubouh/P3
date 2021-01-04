@@ -1,4 +1,6 @@
 import sys
+import time
+
 import numpy as np
 import argparse
 import torch
@@ -34,7 +36,7 @@ def exp_details(args):
     print(f'    Batch size : {args.batch_size}')
     print('Collaborative learning parameters:')
     iid = 'IID' if args.iid else 'Non-IID'
-    size = 'Unequal' if args.enequal else 'Equal'
+    size = 'Unequal' if args.unequal else 'Equal'
     print(f'    Data distribution  : {iid}')
     print(f'    Data size          : {size} data size')
     print(f'    Number of peers    : {args.num_users}')
@@ -323,8 +325,10 @@ def get_neighbors_by_ids(peers, ids):
 
 
 def inference_eval(peer, device, one_batch=False):
+    t = time.time()
     r = peer.model.evaluate(peer.inference, device, one_batch)
-    o = "+" if one_batch else "*"
-    acc = round(r['val_acc'], 2) * 100
+    o = "I" if one_batch else "*"
+    acc = round(r['val_acc']* 100, 2)
     loss = round(r['val_loss'], 2)
-    log('result', f"{peer} achieved {o} Inference accuracy: {acc}% | Inference loss: {loss}")
+    t = round(time.time() - t, 1)
+    log('result', f"Node {peer.id} [{t}s]{o} Inference acc: {acc}%,  loss: {loss}")

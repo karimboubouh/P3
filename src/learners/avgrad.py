@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from src.conf import RECORD_RATE
 from src.p2p import Graph
-from src.utils import log
+from src.utils import log, inference_eval
 
 name = "Gradient Averaging Collaborative Learner"
 
@@ -23,8 +23,8 @@ def collaborate(graph: Graph, device='cpu'):
         peer.params.gradients = []
 
     # prepare tqdm
-    rounds = tqdm(range(graph.args.rounds))
     log("info", f"Collaborative training for {graph.args.rounds} rounds")
+    rounds = tqdm(range(graph.args.rounds))
     for epoch in rounds:
         # Randomly activate a peer
         peer = np.random.choice(graph.peers)
@@ -53,12 +53,13 @@ def collaborate(graph: Graph, device='cpu'):
             avg_step(neighbor)
 
         # Evaluate all models every RECORD_RATE
-        if epoch % RECORD_RATE == 0:
-            run_evaluation(graph, history)
+        if epoch != 0 and epoch % RECORD_RATE == 0:
+            run_evaluation(graph, history, epoch)
             rounds.set_postfix({**{'peer': peer}, **history[peer.id][-1]})
 
+    log("info", f"Evaluating the output of the collaborative training after {graph.args.rounds} rounds.")
     for peer in graph.peers:
-        print(peer, peer.model.evaluate(peer.test))
+        inference_eval(peer, device)
 
     return history
 
@@ -91,16 +92,18 @@ def average_weights(peer):
     return wi
 
 
-def run_evaluation(graph, history):
+def run_evaluation(graph, history, epoch, debug=True):
     t = time.time()
     current = []
     for peer in graph.peers:
         r = peer.model.evaluate(peer.inference, one_batch=True)
         history[peer.id].append(r)
         current.append(r)
-    current_los = np.mean([e['val_loss'] for e in current])
-    current_acc = np.mean([e['val_acc'] for e in current])
-    print(f"\nEvaluation done in {time.time() - t} with mean accuracy: {current_acc} and mean loss {current_los}.")
+    if debug:
+        current_los = round(np.mean([e['val_loss'] for e in current]), 2)
+        current_acc = round(np.mean([e['val_acc'] for e in current]), 2)
+        t = round(time.time() - t, 2)
+        log('', f"\nEvaluation after {epoch} rounds: mean accuracy: {current_acc} | mean loss {current_los}. ({t}s)\n")
 
     return history
 
