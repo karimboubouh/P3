@@ -5,13 +5,14 @@ import numpy as np
 import argparse
 import torch
 
+from random import shuffle
 from termcolor import cprint
 from torch.utils.data.dataloader import DataLoader
 from itertools import combinations
 from scipy.spatial import distance
 
 from src import conf
-from src.conf import TRAIN_VAL_TEST_RATIO
+from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE
 from src.helpers import DatasetSplit, Map
 
 args: argparse.Namespace = None
@@ -264,6 +265,7 @@ def train_val_test(train_ds, mask, args, ratio=None):
     """
     ratio = TRAIN_VAL_TEST_RATIO if ratio is None else ratio
     mask = list(mask)
+    shuffle(mask)
     assert np.sum(ratio) == 1, "Ratio between train, dev and test must sum to 1."
     v1 = int(ratio[0] * len(mask))
     v2 = int((ratio[0] + ratio[1]) * len(mask))
@@ -272,19 +274,16 @@ def train_val_test(train_ds, mask, args, ratio=None):
     val_mask = mask[v1:v2]
     test_mask = mask[v2:]
     # create data loaders
-    train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True,
-                              num_workers=0, pin_memory=True)
-    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False, num_workers=0,
-                            pin_memory=True)
-    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=args.batch_size, shuffle=False,
-                             num_workers=0, pin_memory=True)
+    train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=args.batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
 
 
 def inference_ds(test_ds, args):
     # global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    global_test = DataLoader(test_ds, batch_size=1000, shuffle=False, num_workers=8, pin_memory=True)
+    global_test = DataLoader(test_ds, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
 
     return global_test
 
@@ -328,7 +327,27 @@ def inference_eval(peer, device, one_batch=False):
     t = time.time()
     r = peer.model.evaluate(peer.inference, device, one_batch)
     o = "I" if one_batch else "*"
-    acc = round(r['val_acc']* 100, 2)
+    acc = round(r['val_acc'] * 100, 2)
     loss = round(r['val_loss'], 2)
     t = round(time.time() - t, 1)
     log('result', f"Node {peer.id} [{t}s]{o} Inference acc: {acc}%,  loss: {loss}")
+
+
+def estimate_shards(data_size, num_users):
+    shards = num_users * 2 if num_users > 10 else 20
+    imgs = int(data_size / shards)
+
+    return shards, imgs
+
+
+def fill_history(a):
+    lens = np.array([len(item) for item in a.values()])
+    log('info', f"Number of rounds performed by each peer:")
+    log('', f"{lens}")
+    ncols = lens.max()
+    last_ele = np.array([a_i[-1] for a_i in a.values()])
+    out = np.repeat(last_ele[:, None], ncols, axis=1)
+    mask = lens[:, None] > np.arange(lens.max())
+    out[mask] = np.concatenate(list(a.values()))
+    out = {k: v for k, v in enumerate(out)}
+    return out

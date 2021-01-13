@@ -29,6 +29,7 @@ class Node:
             'epochs': args.epochs,
             'lr': args.lr,
             'opt_func': optimizer_func(args.optimizer),
+            'D': sum(self.similarity.values()),
             'confidence': 1,
             'alpha': 0.9
         })
@@ -62,12 +63,11 @@ class Node:
         :return: None
         """
         # train for single batch
-        batch = next(iter(self.train))  # train for single batch
+        batch = next(iter(self.train))
         # execute one training step
         self.optimizer.zero_grad()
         loss = self.model.train_step(batch, device)
         loss.backward()
-        self.optimizer.step()
         # get gradients
         grads = []
         for param in self.model.parameters():
@@ -102,15 +102,15 @@ class Node:
     def get_gradients(self):
         return self.grads
 
-    def set_gradients(self, grads):
+    def set_gradients(self, grads, device='cpu'):
         idx = 0
-        grads_ = grads.clone()
+        grads_ = grads.clone().cpu()
         for param in self.model.parameters():
             size_layer = len(param.grad.view(-1))
-            grads_layer = torch.Tensor(grads_[idx: idx + size_layer]).reshape_as(param.grad).detach()
+            grads_layer = torch.Tensor(grads_[idx: idx + size_layer]).reshape_as(param.grad).detach().to(device)
             param.grad = grads_layer
             idx += size_layer
-        self.grads = grads_
+        self.grads = grads_.to(device)
 
     def take_step(self):
         self.model.train()
@@ -206,6 +206,11 @@ class Graph:
                 log('',
                     f"{peer} has: {len(peer.train.dataset)} train samples / {len(peer.val.dataset)} validation samples "
                     f"/ {len(peer.test.dataset)} test samples / {len(peer.inference.dataset)} inference samples")
+
+        for peer in self.peers:
+            iterator = iter(peer.train)
+            x_batch, y_batch = iterator.next()
+            log('info', f"{peer}: [{len(peer.train.dataset)}] {set(y_batch.numpy())}")
 
     def __len__(self):
         return len(self.peers)

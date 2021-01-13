@@ -18,9 +18,13 @@ if __name__ == '__main__':
     start_time = time.time()
     # load experiment configuration from CLI arguments
     args = load_conf()
-    args.num_users = 100
-    args.epochs = 10
-    args.rounds = 500
+    args.iid = 0
+    args.batch_size = 128
+    args.unequal = 1
+    args.num_users = 15
+    args.epochs = 1
+
+    args.rounds = 2000
     # print experiment details
     exp_details(args)
     # set device
@@ -30,11 +34,11 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=False, device=device)
     # setup the network topology
-    topology = random_graph(models, sigma=0.2)
+    topology = random_graph(models, sigma=0.3)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args)
-    # graph.show_similarity()
-    # graph.show_neighbors(verbose=True)
+    graph.show_similarity()
+    # graph.show_neighbors()
 
     # perform local training
     train_logs = graph.local_training(device)
