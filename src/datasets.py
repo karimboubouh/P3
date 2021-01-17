@@ -1,4 +1,5 @@
 import numpy as np
+from torch.utils.data import ConcatDataset
 from torchvision import datasets, transforms
 
 from src.utils import estimate_shards
@@ -84,7 +85,7 @@ def mnist_noniid(dataset, num_users):
     """
     # 60,000 training imgs -->  200 imgs/shard X 300 shards
     # num_shards, num_imgs = 200, 300
-    num_shards, num_imgs = estimate_shards(60000, num_users)
+    num_shards, num_imgs = estimate_shards(len(dataset), num_users)
     idx_shard = [i for i in range(num_shards)]
     dict_users = {i: np.array([]) for i in range(num_users)}
     idxs = np.arange(num_shards * num_imgs)

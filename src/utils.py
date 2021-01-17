@@ -1,5 +1,6 @@
 import sys
 import time
+from functools import partial
 
 import numpy as np
 import argparse
@@ -7,12 +8,12 @@ import torch
 
 from random import shuffle
 from termcolor import cprint
-from torch.utils.data.dataloader import DataLoader
+from torch.utils.data.dataloader import DataLoader, default_collate
 from itertools import combinations
 from scipy.spatial import distance
 
 from src import conf
-from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE
+from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE, TEST_SCOPE
 from src.helpers import DatasetSplit, Map
 
 args: argparse.Namespace = None
@@ -40,6 +41,7 @@ def exp_details(args):
     size = 'Unequal' if args.unequal else 'Equal'
     print(f'    Data distribution  : {iid}')
     print(f'    Data size          : {size} data size')
+    print(f'    Test scope         : {args.test_scope}')
     print(f'    Number of peers    : {args.num_users}')
     print(f'    Rounds             : {args.rounds}')
 
@@ -86,6 +88,8 @@ def args_parser():
     # other arguments
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
                         of dataset")
+    parser.add_argument('--test_scope', type=str, default='local', help="test \
+                        data scope (local, neighborhood, global)")
     parser.add_argument('--num_classes', type=int, default=10, help="number \
                         of classes")
     parser.add_argument('--gpu', default=None, help="To use cuda, set \
@@ -281,11 +285,30 @@ def train_val_test(train_ds, mask, args, ratio=None):
     return train_loader, val_loader, test_loader
 
 
-def inference_ds(test_ds, args):
+def inference_ds(peer, args):
     # global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    global_test = DataLoader(test_ds, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
+    test = None
+    if args.test_scope == 'global':
+        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
+    elif args.test_scope == 'neighborhood':
+        collate = partial(collate_fn, scope=peer.neighborhood_data_scope())
+        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, collate_fn=collate)
+    elif args.test_scope == 'local':
+        collate = partial(collate_fn, scope=peer.local_data_scope())
+        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, collate_fn=collate)
+    else:
+        exit('Error: unrecognized TEST_SCOPE value')
 
-    return global_test
+    return test
+
+
+def collate_fn(batch, scope):
+    modified_batch = []
+    for item in batch:
+        image, label = item
+        if label in scope:
+            modified_batch.append(item)
+    return default_collate(modified_batch)
 
 
 def optimizer_func(optim):

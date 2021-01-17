@@ -19,12 +19,13 @@ if __name__ == '__main__':
     # load experiment configuration from CLI arguments
     args = load_conf()
     args.iid = 0
-    args.batch_size = 128
-    args.unequal = 1
-    args.num_users = 15
-    args.epochs = 1
+    args.batch_size = 256
+    args.unequal = 0
+    args.num_users = 20
+    args.epochs = 3
+    args.test_scope = "neighborhood"
 
-    args.rounds = 2000
+    args.rounds = 500
     # print experiment details
     exp_details(args)
     # set device
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=False, device=device)
     # setup the network topology
-    topology = random_graph(models, sigma=0.3)
+    topology = random_graph(models, sigma=-0.7)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args)
     graph.show_similarity()

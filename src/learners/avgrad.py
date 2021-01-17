@@ -74,7 +74,7 @@ def collaborate(graph: Graph, device='cpu'):
 def get_update(peer, neighbor):
     Wj = peer.similarity[neighbor.id]
     G = neighbor.get_gradients()
-    return (Wj/peer.params.D) * G
+    return (Wj / peer.params.D) * G
 
 
 def avg_step(peer, history, device):

@@ -5,7 +5,7 @@ from typing import List
 import torch
 
 from src.helpers import Map
-from src.utils import optimizer_func, log, inference_eval
+from src.utils import optimizer_func, log, inference_eval, inference_ds
 
 
 class Node:
@@ -117,6 +117,17 @@ class Node:
         self.optimizer.step()
         self.optimizer.zero_grad()
 
+    def local_data_scope(self):
+        batch = next(iter(self.train))
+        scope = set(batch[1].numpy())
+        return list(scope)
+
+    def neighborhood_data_scope(self):
+        scope = set(self.local_data_scope())
+        for neighbor in self.neighbors:
+            scope = scope.union(neighbor.local_data_scope())
+        return list(scope)
+
     #  Private methods --------------------------------------------------------
 
     def _eval_sample(self, sample):
@@ -211,6 +222,10 @@ class Graph:
             iterator = iter(peer.train)
             x_batch, y_batch = iterator.next()
             log('info', f"{peer}: [{len(peer.train.dataset)}] {set(y_batch.numpy())}")
+
+    def set_inference(self, args):
+        for peer in self.peers:
+            peer.inference = inference_ds(peer, args)
 
     def __len__(self):
         return len(self.peers)

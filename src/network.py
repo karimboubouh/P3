@@ -78,13 +78,14 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args):
     peers = list()
     for i in range(nbr_nodes):
         neighbors_ids, similarity, train, val, test = node_info(i, topology, train_ds, user_groups[i], args)
-        inference = inference_ds(test_ds, args)
-        data = {'train': train, 'val': val, 'test': test, 'inference': inference}
+        data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
         peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
         peers.append(peer)
     for peer in peers:
         neighbors = [p for p in peers if p.id in peer.neighbors]
         peer.set_neighbors(neighbors)
     graph = Graph(peers, topology, test_ds, args)
+    # Transformations
+    graph.set_inference(args)
 
     return graph
