@@ -2,12 +2,13 @@ import numpy as np
 from tqdm import tqdm
 
 from src.conf import RECORD_RATE
+from src.p2p import Graph
 from src.utils import log
 
 name = "Model Propagation Learner"
 
 
-def collaborate(graph):
+def collaborate(graph: Graph, device='cpu'):
     # initialize history holder
     history = dict.fromkeys(range(len(graph.peers)))
     for k in history.keys():

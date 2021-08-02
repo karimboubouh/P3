@@ -1,16 +1,16 @@
 from copy import deepcopy
-
 import torch
 import numpy as np
 from tqdm import tqdm
 
 from src.conf import RECORD_RATE
+from src.p2p import Graph
 from src.utils import log
 
 name = "Average-based Collaborative Learner"
 
 
-def collaborate(graph):
+def collaborate(graph: Graph, device='cpu'):
     # initialize history holder
     history = dict.fromkeys(range(len(graph.peers)))
     for k in history.keys():
@@ -44,7 +44,7 @@ def collaborate(graph):
             average_weights(neighbor)
 
         # Evaluate all models every RECORD_RATE
-        if epoch % RECORD_RATE == 0:
+        if (epoch + 1) % RECORD_RATE == 0:
             run_evaluation(graph, history)
             rounds.set_postfix({**{'peer': peer}, **history[peer.id][-1]})
 

@@ -1,78 +1,170 @@
+from __future__ import annotations
+
+import pickle
+import socket
+import struct
 import time
+import traceback
 from copy import deepcopy
+from threading import Thread
 from typing import List
 
+import numpy as np
 import torch
 
+from src import protocol
+from src.conf import HOST, PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN
 from src.helpers import Map
-from src.utils import optimizer_func, log, inference_eval, inference_ds
+from src.utils import optimizer_func, log, inference_eval, inference_ds, create_tcp_socket
 
 
-class Node:
+class Node(Thread):
 
-    def __init__(self, k, model, data, neighbors, clustered, similarity, args, params=None):
+    def __init__(self, k, model, data, neighbors_ids, clustered, similarity, args: Map, params=None):
+        super(Node, self).__init__()
         self.id = k
+        self.host = HOST
+        self.port = PORT + k
+        self.device = args.device
         self.model = model
         self.local_model = model
         self.optimizer = None
         self.grads = None
-        self.neighbors = neighbors
+        self.V = {}
+        self.current_round = 0
+        self.current_exec = None
+        self.neighbors_ids = neighbors_ids
+        self.neighbors = []
+        self.in_neighbors = []
         self.clustered = clustered
         self.similarity = similarity
         self.train = data.get('train', None)
         self.val = data.get('val', None)
         self.test = data.get('test', None)
         self.inference = data.get('inference', None)
+        self.terminate = False
         # default params
         self.params = Map({
-            'rounds': args.rounds,
+            'frac': args.frac,
             'epochs': args.epochs,
             'lr': args.lr,
+            'momentum': args.momentum,
             'opt_func': optimizer_func(args.optimizer),
+            'gar': args.gar,
             'D': sum(self.similarity.values()),
             'confidence': 1,
-            'alpha': 0.9
+            'alpha': 0.9,
         })
         # override params if provided
         if isinstance(params, Map):
             self.params = Map(dict(self.params, **params))
+        # initialize networks
+        self._init_server()
 
-    def fit(self, device='cpu'):
+    def run(self):
+        while not self.terminate:
+            try:
+                conn, address = self.sock.accept()
+                if not self.terminate:
+                    neighbor_conn = NodeConnection(self, address[1], conn)
+                    neighbor_conn.start()
+                    self.neighbors.append(neighbor_conn)
+                    # self.in_neighbors.append(in_neighbor_conn)
+            except socket.timeout:
+                pass
+            except Exception as e:
+                log('error', f"{self}: Node Exception\n{e}")
+
+        for neighbor in self.neighbors:
+            neighbor.stop()
+        self.sock.close()
+        log('log', f"{self}: Stopped")
+
+    def connect(self, neighbor: Node):
+        try:
+            if neighbor.id in [n.neighbor_id for n in self.neighbors]:
+                log('log', f"{self}, neighbor {neighbor} already connected.")
+                return True
+            sock = create_tcp_socket()
+            sock.settimeout(SOCK_TIMEOUT)
+            sock.connect((neighbor.host, neighbor.port))
+            neighbor_conn = NodeConnection(self, neighbor.id, sock)
+            neighbor_conn.start()
+            neighbor_conn.send(protocol.connect(sock.getsockname(), self.id))
+            self.neighbors.append(neighbor_conn)
+            return True
+        except Exception as e:
+            log('error', f"{self}: Can't connect to {neighbor} -- {e}")
+            return False
+
+    def disconnect(self, neighbor_conn: NodeConnection):
+        if not neighbor_conn.terminate:
+            neighbor_conn.send(protocol.disconnect(self.id))
+            neighbor_conn.terminate = True
+            if neighbor_conn in self.neighbors:
+                self.neighbors.remove(neighbor_conn)
+            log('log', f"{self} disconnected from {neighbor_conn.neighbor_name}")
+
+    def stop(self):
+        for neighbor in self.neighbors:
+            self.disconnect(neighbor)
+        self.terminate = True
+
+    def send(self, neighbor: NodeConnection, msg):
+        neighbor.send(msg)
+
+    def broadcast(self, msg, active=None):
+        active = self.neighbors if active is None else active
+        for neighbor in active:
+            self.send(neighbor, msg)
+
+    def execute(self, func, *args):
+        try:
+            self.current_exec = Thread(target=func, args=(self, *args), name=func.__name__)
+            self.current_exec.daemon = True
+            self.current_exec.start()
+        except Exception as e:
+            log('error', f"{self} Execute exception: {e}")
+            traceback.print_exc()
+            return None
+
+    def fit(self, inference=True):
         history = []
         self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
         for epoch in range(self.params.epochs):
             for batch in self.train:
                 # Train Phase
-                loss = self.model.train_step(batch, device)
+                loss = self.model.train_step(batch, self.device)
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
             # Validation Phase
-            result = self.model.evaluate(self.val, device)
+            result = self.model.evaluate(self.val, self.device)
             self.model.epoch_end(epoch, result)
             history.append(result)
-        # evaluate against a batch of the inference dataset
-        inference_eval(self, device)
+        if inference:
+            # evaluate against a batch of the inference dataset
+            inference_eval(self)
         # set local model variable
         self.local_model = self.model
         return history
 
-    def train_one_epoch(self, device='cpu', random=False, evaluate=False):
-        """
-        Train the model on a random batch of the data
-        :return: None
-        """
-        # train for single batch
-        batch = next(iter(self.train))
-        # execute one training step
-        self.optimizer.zero_grad()
-        loss = self.model.train_step(batch, device)
-        loss.backward()
-        # get gradients
-        grads = []
-        for param in self.model.parameters():
-            grads.append(param.grad.view(-1))
-        self.grads = torch.cat(deepcopy(grads))
+    def train_one_epoch(self, batches=1, evaluate=False):
+        for i in range(batches):
+            # train for single batch randomly chosen when Dataloader is set with shuffle=True
+            batch = next(iter(self.train))
+            # execute one training step
+            if self.optimizer:
+                self.optimizer.zero_grad()
+            else:
+                self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
+            loss = self.model.train_step(batch, self.device)
+            loss.backward()
+            # get gradients
+            grads = []
+            for param in self.model.parameters():
+                grads.append(param.grad.view(-1))
+            self.grads = torch.cat(deepcopy(grads))
 
         return loss, grads
 
@@ -102,15 +194,15 @@ class Node:
     def get_gradients(self):
         return self.grads
 
-    def set_gradients(self, grads, device='cpu'):
+    def set_gradients(self, grads):
         idx = 0
         grads_ = grads.clone().cpu()
         for param in self.model.parameters():
             size_layer = len(param.grad.view(-1))
-            grads_layer = torch.Tensor(grads_[idx: idx + size_layer]).reshape_as(param.grad).detach().to(device)
+            grads_layer = torch.Tensor(grads_[idx: idx + size_layer]).reshape_as(param.grad).detach().to(self.device)
             param.grad = grads_layer
             idx += size_layer
-        self.grads = grads_.to(device)
+        self.grads = grads_.to(self.device)
 
     def take_step(self):
         self.model.train()
@@ -133,6 +225,12 @@ class Node:
     def _eval_sample(self, sample):
         pass
 
+    def _init_server(self):
+        self.sock = create_tcp_socket()
+        self.sock.bind((self.host, self.port))
+        self.sock.settimeout(SOCK_TIMEOUT)
+        self.sock.listen(TCP_SOCKET_SERVER_LISTEN)
+
     # Special methods
     def __repr__(self):
         return f"Node({self.id})"
@@ -141,9 +239,95 @@ class Node:
         return f"Node({self.id})"
 
 
+class NodeConnection(Thread):
+    def __init__(self, node, neighbor_id, sock):
+        super(NodeConnection, self).__init__()
+        self.node = node
+        self.sock = sock
+        self.address = None
+        self.neighbor_id = neighbor_id
+        self.neighbor_name = f"Node({neighbor_id})"
+        self.terminate = False
+
+    def run(self):
+        # Wait for messages from device
+        while not self.terminate:
+            try:
+                (length,) = struct.unpack('>Q', self.sock.recv(8))
+                buffer = b''
+                while len(buffer) < length:
+                    to_read = length - len(buffer)
+                    buffer += self.sock.recv(4096 if to_read > 4096 else to_read)
+                if buffer:
+                    data = pickle.loads(buffer)
+                    if data and data['mtype'] == protocol.TRAIN_STEP:
+                        self.handle_step(data['data'])
+                    elif data and data['mtype'] == protocol.CONNECT:
+                        self.handle_connect(data['data'])
+                    elif data and data['mtype'] == protocol.DISCONNECT:
+                        self.handle_disconnect(data['data'])
+                    else:
+                        log('error', f"{self.node.name}: Unknown type of message: {data['mtype']}.")
+            except pickle.UnpicklingError as e:
+                log('error', f"{self.node}: Corrupted message : {e}")
+            except socket.timeout:
+                pass
+            except struct.error as e:
+                pass
+            except Exception as e:
+                self.terminate = True
+                # todo remove node from list of connected neighbors
+                traceback.print_exc()
+                log('error', f"{self.node} NodeConnection <{self.neighbor_name}> Exception\n{e}")
+        self.sock.close()
+        log('log', f"{self.node}: neighbor {self.neighbor_name} disconnected")
+
+    def send(self, msg):
+        try:
+            if self.terminate:
+                log('log', f"{self} tries to send on terminated")
+            length = struct.pack('>Q', len(msg))
+            self.sock.sendall(length)
+            self.sock.sendall(msg)
+        except socket.error as e:
+            self.terminate = True
+            log('error', f"{self}: Socket error: {e}: ")
+        except Exception as e:
+            log('error', f"{self}: Exception\n{e}")
+
+    def stop(self):
+        self.terminate = True
+
+    def handle_step(self, data):
+        self.node.params.exchanges += 1
+        if self.node.current_round <= data['t']:
+            if data['t'] in self.node.V:
+                self.node.V[data['t']].append((self.neighbor_id, data['vi']))
+            else:
+                self.node.V[data['t']] = [(self.neighbor_id, data['vi'])]
+
+    def handle_connect(self, data):
+        self.neighbor_id = data['id']
+        self.address = data['address']
+
+    def handle_disconnect(self, data):
+        self.terminate = True
+        if self in self.node.neighbors:
+            self.node.neighbors.remove(self)
+
+    #  Private methods --------------------------------------------------------
+
+    def __repr__(self):
+        return f"NodeConn({self.node.id}, {self.neighbor_id})"
+
+    def __str__(self):
+        return f"NodeConn({self.node.id}, {self.neighbor_id})"
+
+
 class Graph:
 
     def __init__(self, peers, topology, test_ds, args):
+        self.device = args.device
         self.peers = peers  # type: List[Node]
         self.clusters = topology['clusters']
         self.similarity = topology['similarities']
@@ -151,13 +335,17 @@ class Graph:
         self.test_ds = test_ds
         self.args = args
 
-    def local_training(self, device='cpu'):
+    def local_training(self, device='cpu', inference=True):
         t = time.time()
         log('event', 'Starting local training ...')
         histories = dict()
         for peer in self.peers:
-            log('info', f"{peer} is performing local training on {len(peer.train.dataset)} samples ...")
-            histories[peer] = peer.fit(device)
+            classes = []
+            for b in peer.train:
+                classes.extend(b[1].numpy())
+            log('info',
+                f"{peer} is performing local training on {len(peer.train.dataset)} samples of classes {set(classes)}.")
+            histories[peer] = peer.fit(inference)
         t = time.time() - t
         log("success", f"Local training finished in {t:.2f} seconds.")
 
@@ -180,13 +368,26 @@ class Graph:
 
         return history
 
-    def collaborative_training(self, learner, device):
+    def collaborative_training(self, learner, args):
         t = time.time()
         log('event', f'Starting collaborative training using {learner.name} ...')
-        collab_logs = learner.collaborate(self, device)
+        collab_logs = learner.collaborate(self, args)
         t = time.time() - t
         log("success", f"Collaborative training finished in {t:.2f} seconds.")
         return collab_logs
+
+    def join(self, r=None):
+        t = time.time()
+        name = self.peers[0].current_exec.name
+        for peer in self.peers:
+            if peer.current_exec is not None:
+                peer.current_exec.join()
+                peer.current_exec = None
+        t = time.time() - t
+        if r:
+            log("log", f"Round {r}: {name} joined in {t:.2f} seconds.")
+        else:
+            log("success", f"{name} joined in {t:.2f} seconds.")
 
     def get_peers(self):
         return self.peers
@@ -199,13 +400,16 @@ class Graph:
         if scope == 'local' and metric == 'accuracy':
             accuracy_epochs()
 
-    def show_similarity(self, matrix=False):
+    def show_similarity(self, ids=False, matrix=False):
         log('info', "Similarity Matrix")
         if matrix:
-            log('', self.similarity)
+            print(self.similarity)
         else:
             for peer in self.peers:
-                s = {k: round(v, 2) for k, v in peer.similarity.items()}
+                if ids:
+                    s = list(peer.similarity.keys())
+                else:
+                    s = {k: round(v, 2) for k, v in peer.similarity.items()}
                 log('', f"{peer}: {s}")
 
     def show_neighbors(self, verbose=False):
@@ -218,14 +422,21 @@ class Graph:
                     f"{peer} has: {len(peer.train.dataset)} train samples / {len(peer.val.dataset)} validation samples "
                     f"/ {len(peer.test.dataset)} test samples / {len(peer.inference.dataset)} inference samples")
 
-        for peer in self.peers:
-            iterator = iter(peer.train)
-            x_batch, y_batch = iterator.next()
-            log('info', f"{peer}: [{len(peer.train.dataset)}] {set(y_batch.numpy())}")
+                iterator = iter(peer.train)
+                x_batch, y_batch = iterator.next()
+                log('', f"{peer} has: [{len(peer.train.dataset)}] {set(y_batch.numpy())}")
+                print()
 
     def set_inference(self, args):
         for peer in self.peers:
             peer.inference = inference_ds(peer, args)
+
+    def PSS(self, peer: Node, k):
+        nid = [n.neighbor_id for n in peer.neighbors]
+        nid.append(peer.id)
+        candidates = [p for p in self.peers if p.id not in nid]
+        k = min(k, len(candidates))
+        return np.random.choice(candidates, k, replace=False)
 
     def __len__(self):
         return len(self.peers)

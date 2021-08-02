@@ -103,6 +103,24 @@ def datasim_network(data, sigma=0.2):
 
 
 if __name__ == '__main__':
+    E = 1
+    e = E
+    r = 0
+    x = lambda c, b: int(c + b / np.log(b))
+    for t in range(0, 2000):
+        if e == t:
+            d = e
+            r += 1
+            e = int(e + np.sqrt(E * t))
+            print(f"Next round: {e}")
+    print(f"Total: {r} rounds")
+    exit()
+    x = {}
+    t = 0
+    x[t] = (2, 3)
+    if x.get(1):
+        print(x)
+    exit()
     x = Map()
     y = Map()
     z = Map()

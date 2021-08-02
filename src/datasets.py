@@ -1,5 +1,6 @@
 import numpy as np
 from torch.utils.data import ConcatDataset
+from numpy.random import multinomial
 from torchvision import datasets, transforms
 
 from src.utils import estimate_shards
@@ -23,7 +24,12 @@ def get_dataset(args):
         # sample training data amongst users
         if args.iid:
             # Sample IID user data from Mnist
-            user_groups = mnist_iid(train_dataset, args.num_users)
+            if args.unequal:
+                # Chose unequal splits for every user
+                user_groups = mnist_iid_unequal(train_dataset, args.num_users)
+            else:
+                # Chose equal splits for every user
+                user_groups = mnist_iid(train_dataset, args.num_users)
         else:
             # Sample Non-IID user data from Mnist
             if args.unequal:
@@ -71,6 +77,24 @@ def mnist_iid(dataset, num_users):
     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
     for i in range(num_users):
         dict_users[i] = set(np.random.choice(all_idxs, num_items,
+                                             replace=False))
+        all_idxs = list(set(all_idxs) - dict_users[i])
+    return dict_users
+
+
+def mnist_iid_unequal(dataset, num_users):
+    """
+    Sample I.I.D. client data from MNIST dataset s.t clients
+    have unequal amount of data
+    :param dataset:
+    :param num_users:
+    :return: dict of image index
+    """
+    s = np.random.dirichlet(np.ones(num_users), size=1).flatten()
+    num_items = multinomial(len(dataset), s)
+    dict_users, all_idxs = {}, [i for i in range(len(dataset))]
+    for i in range(num_users):
+        dict_users[i] = set(np.random.choice(all_idxs, num_items[i],
                                              replace=False))
         all_idxs = list(set(all_idxs) - dict_users[i])
     return dict_users

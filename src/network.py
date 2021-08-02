@@ -1,12 +1,16 @@
+from time import sleep
+from typing import List
+
 import numpy as np
 from itertools import combinations
 from scipy.spatial import distance
 
+from src.conf import PORT, HOST
 from src.p2p import Node, Graph
 from src.utils import cluster_peers, similarity_matrix, node_info, inference_ds, log
 
 
-def random_graph(models, sigma=0.2, cluster_enabled=False, k=2):
+def random_graph(models, sigma=0.2, cluster_enabled=False, k=2, data=None):
     if sigma and sigma < 0:
         log('warning', f"Generating a negative similarity matrix.")
     # prob_edge = 1, rnd_state = None
@@ -15,7 +19,11 @@ def random_graph(models, sigma=0.2, cluster_enabled=False, k=2):
         clusters = cluster_peers(nb_nodes, k)
     else:
         clusters = {0: np.arange(nb_nodes)}
-    adjacency, similarities = similarity_matrix(nb_nodes, clusters, sigma)
+    if data:
+        adjacency, similarities = similarity_matrix(models, clusters, sigma, data=data)
+    else:
+        adjacency, similarities = similarity_matrix(nb_nodes, clusters, sigma, data=data)
+
     return {
         'clusters': clusters,
         'similarities': similarities,
@@ -80,12 +88,26 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args):
         neighbors_ids, similarity, train, val, test = node_info(i, topology, train_ds, user_groups[i], args)
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
         peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
+        peer.start()
         peers.append(peer)
-    for peer in peers:
-        neighbors = [p for p in peers if p.id in peer.neighbors]
-        peer.set_neighbors(neighbors)
+    connect_to_neighbors(peers)
     graph = Graph(peers, topology, test_ds, args)
     # Transformations
     graph.set_inference(args)
 
     return graph
+
+
+def connect_to_neighbors(peers: List[Node]):
+    connected = True
+    for peer in peers:
+        neighbors = [p for p in peers if p.id in peer.neighbors_ids]
+        for neighbor in neighbors:
+            if not peer.connect(neighbor):
+                log('error', f"{peer} --> {neighbor} Not connected")
+                connected = False
+        sleep(0.05)
+    if connected:
+        log('success', f"Peers successfully connected with their neighbors.")
+    else:
+        log('error', f"Some peers could not connect with their neighbors.")

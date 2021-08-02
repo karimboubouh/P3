@@ -8,6 +8,7 @@ classes : - MLP
           - ModelBased
 """
 import copy
+from abc import ABC
 
 import torch
 import torch.nn as nn
@@ -16,7 +17,7 @@ import torch.nn.functional as F
 from src.utils import log
 
 
-def initialize_models(args, same=False, device='cpu'):
+def initialize_models(args, same=False):
     # INITIALIZE PEERS MODELS
     models = []
     modelClass = None
@@ -63,14 +64,14 @@ def initialize_models(args, same=False, device='cpu'):
             models.append(model)
 
     for model in models:
-        model.to(device)
+        model.to(args.device)
 
     return models
 
 
 # -- Base Model ---------------------------------------------------------------
 
-class ModelBase(nn.Module):
+class ModelBase(nn.Module, ABC):
     """Shared methods between models"""
 
     def __init__(self):
