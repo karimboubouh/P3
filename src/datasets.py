@@ -1,19 +1,25 @@
+from time import sleep
+
 import numpy as np
 from torch.utils.data import ConcatDataset
 from numpy.random import multinomial
 from torchvision import datasets, transforms
 
+from src.measure_energy import measure_energy
+from src.profiler import profiler
 from src.utils import estimate_shards
 
 
+# @profiler(timer="cpu")
+# @profiler
+# @measure_energy
 def get_dataset(args):
     """ Returns train and test datasets and a user group which is a dict where
     the keys are the user index and the values are the corresponding data for
     each of those users.
     """
-
     if args.dataset == 'mnist':
-        data_dir = '../data/mnist/'
+        data_dir = '../data33/mnist/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))  # mean/std over 1 channel
@@ -40,7 +46,7 @@ def get_dataset(args):
                 user_groups = mnist_noniid(train_dataset, args.num_users)
 
     elif args.dataset == 'cifar':
-        data_dir = '../data/cifar/'
+        data_dir = '../data33/cifar/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # mean/std over 3 channels

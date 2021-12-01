@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from src import conf
+from src.conf import EVAL_ROUND
 from src.helpers import Map
 from src.utils import log, verify_metrics
 
@@ -25,7 +26,8 @@ def plot_train_history(logs, metric='accuracy', measure="mean", info=None):
         xlabel = info.get('xlabel', xlabel)
         ylabel = info.get('ylabel', ylabel)
         title = info.get('title', title)
-    plt.plot(data)  # , '-x'
+    x = range(0, len(data) * EVAL_ROUND, EVAL_ROUND)
+    plt.plot(x, data)  # , '-x'
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)

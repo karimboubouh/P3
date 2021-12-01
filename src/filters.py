@@ -18,7 +18,7 @@ def angular_filter(peer, metric="cosine"):
     return accepted, rejected
 
 
-def angular_metric(u, v, metric="cosine", similarity=False):
+def angular_metric(u, v, metric="cosine"):
     """
     Angular metric: calculates the angle and distance between two
     vectors using different distance metrics: euclidean, cosine,
@@ -75,10 +75,10 @@ if __name__ == '__main__':
     print(x - y)
     print(x - y - z)
     print(torch.cdist(x - y, z).item())
-    print(angular_metric(x - y, z, metric="cosine", similarity=True))
+    print(angular_metric(x - y, z, metric="cosine"))
     exit()
 
-    a, d = angular_metric(x, y, metric="cosine", similarity=True)
+    a, d = angular_metric(x, y, metric="cosine")
     print(f"cosine >> Distance = {d}, Angle = {a}°")
 
     a, d = angular_metric(x, y, metric="euclidean")

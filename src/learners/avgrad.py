@@ -92,14 +92,14 @@ def train_step(peer, t, PSS):
         else:
             log('log', f"{peer} -- T= {t} -- Got enough messages : {len(peer.V[t])}.")
         # collaborativeUpdate
-        v_t = collaborativeUpdate(peer, t)
+        v_t = collaborativeUpdateLight(peer, t)
         # update and evaluate the model
         # TODO Review update function
         update_model(peer, v_t, evaluate=(t % 10 == 0))
         # start accepting gradients from next round
         peer.current_round = t + 1
         del peer.V[t]
-        networkUpdate(peer, t, PSS)
+        # networkUpdate(peer, t, PSS)
     return
 
 
@@ -137,6 +137,15 @@ def collaborativeUpdate(peer, t):
 
     # update beta
     peer.params.beta = 1 - np.mean([*peer.params.Wi.values()])
+    return v_gar
+
+
+def collaborativeUpdateLight(peer, t):
+    v_ref = peer.get_gradients()
+    accepted = [v_ref]
+    for j, v_j in peer.V[t]:
+        accepted.append(v_j)
+    v_gar = GAR(peer, accepted)
     return v_gar
 
 

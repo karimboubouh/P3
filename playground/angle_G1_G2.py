@@ -1,5 +1,5 @@
 from math import pi
-
+from pyJoules.energy_meter import measure_energy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -80,8 +80,15 @@ def angular_metric(u, v, metric="cosine"):
     return angle, distance
 
 
-if __name__ == '__main__':
+@measure_energy
+def run():
+    torch.device('cpu')
     x = torch.Tensor([[1, 1]])
     y = torch.Tensor([[-2, 5]])
-    a, d = angular_metric(x, y, metric="TS-SS")
+    for i in range(100):
+        a, d = angular_metric(x, y, metric="TS-SS")
     print(f"Distance = {d}, Angle = {a}°")
+
+
+if __name__ == '__main__':
+    run()

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from time import sleep
 from typing import List
 
@@ -86,9 +87,9 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args):
     peers = list()
     for i in range(nbr_nodes):
         neighbors_ids, similarity, train, val, test = node_info(i, topology, train_ds, user_groups[i], args)
-        data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
+        data = {'train': train, 'val': val, 'test': test, 'inference': deepcopy(test_ds)}
         peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
-        peer.start()
+        # peer.start()
         peers.append(peer)
     connect_to_neighbors(peers)
     graph = Graph(peers, topology, test_ds, args)
@@ -106,8 +107,32 @@ def connect_to_neighbors(peers: List[Node]):
             if not peer.connect(neighbor):
                 log('error', f"{peer} --> {neighbor} Not connected")
                 connected = False
-        sleep(0.05)
+        sleep(0.01)
     if connected:
         log('success', f"Peers successfully connected with their neighbors.")
     else:
         log('error', f"Some peers could not connect with their neighbors.")
+
+
+def connect_to_neighbors_2(peers: List[Node]):
+    connected = True
+    nthreads = 0
+    pees = 0
+    for peer in peers:
+        neighbors = [p for p in peers if p.id in peer.neighbors_ids]
+        pees += len(peer.neighbors_ids)
+        for neighbor in neighbors:
+            if not peer.connect(neighbor):
+                log('error', f"{peer} --> {neighbor} Not connected")
+                connected = False
+        nthreads += len(peer.neighbors)
+        log('warning', f"Current {pees} - {nthreads}")
+        sleep(0.01)
+    if connected:
+        log('success', f"Peers successfully connected with their neighbors.")
+    else:
+        log('error', f"Some peers could not connect with their neighbors.")
+
+    for peer in peers:
+        log('event', peer.neighbors)
+    exit()

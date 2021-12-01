@@ -23,6 +23,7 @@ class Node(Thread):
     def __init__(self, k, model, data, neighbors_ids, clustered, similarity, args: Map, params=None):
         super(Node, self).__init__()
         self.id = k
+        self.mp = bool(args.mp)
         self.host = HOST
         self.port = PORT + k
         self.device = args.device
@@ -85,13 +86,21 @@ class Node(Thread):
             if neighbor.id in [n.neighbor_id for n in self.neighbors]:
                 log('log', f"{self}, neighbor {neighbor} already connected.")
                 return True
-            sock = create_tcp_socket()
-            sock.settimeout(SOCK_TIMEOUT)
-            sock.connect((neighbor.host, neighbor.port))
-            neighbor_conn = NodeConnection(self, neighbor.id, sock)
-            neighbor_conn.start()
-            neighbor_conn.send(protocol.connect(sock.getsockname(), self.id))
-            self.neighbors.append(neighbor_conn)
+            if self.mp:
+                sock = create_tcp_socket()
+                sock.settimeout(SOCK_TIMEOUT)
+                sock.connect((neighbor.host, neighbor.port))
+                neighbor_conn = NodeConnection(self, neighbor.id, sock)
+                neighbor_conn.start()
+                neighbor_conn.send(protocol.connect(sock.getsockname(), self.id))
+                self.neighbors.append(neighbor_conn)
+            else:
+                slink = NodeLink(self, neighbor, None)
+                dlink = NodeLink(neighbor, self, slink)
+                slink.link = dlink
+                self.neighbors.append(slink)
+                neighbor.neighbors.append(dlink)
+
             return True
         except Exception as e:
             log('error', f"{self}: Can't connect to {neighbor} -- {e}")
@@ -110,7 +119,7 @@ class Node(Thread):
             self.disconnect(neighbor)
         self.terminate = True
 
-    def send(self, neighbor: NodeConnection, msg):
+    def send(self, neighbor, msg):
         neighbor.send(msg)
 
     def broadcast(self, msg, active=None):
@@ -121,7 +130,8 @@ class Node(Thread):
     def execute(self, func, *args):
         try:
             self.current_exec = Thread(target=func, args=(self, *args), name=func.__name__)
-            self.current_exec.daemon = True
+            # self.current_exec = Process(target=func, args=(self, *args), name=func.__name__)
+            # self.current_exec.daemon = True
             self.current_exec.start()
         except Exception as e:
             log('error', f"{self} Execute exception: {e}")
@@ -130,7 +140,7 @@ class Node(Thread):
 
     def fit(self, inference=True):
         history = []
-        self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
+        self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)  # , 0.99
         for epoch in range(self.params.epochs):
             for batch in self.train:
                 # Train Phase
@@ -160,6 +170,9 @@ class Node(Thread):
                 self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
             loss = self.model.train_step(batch, self.device)
             loss.backward()
+            # TODO new verify
+            self.optimizer.step()
+            self.optimizer.zero_grad()
             # get gradients
             grads = []
             for param in self.model.parameters():
@@ -302,9 +315,9 @@ class NodeConnection(Thread):
         self.node.params.exchanges += 1
         if self.node.current_round <= data['t']:
             if data['t'] in self.node.V:
-                self.node.V[data['t']].append((self.neighbor_id, data['vi']))
+                self.node.V[data['t']].append((self.neighbor_id, data['update']))
             else:
-                self.node.V[data['t']] = [(self.neighbor_id, data['vi'])]
+                self.node.V[data['t']] = [(self.neighbor_id, data['update'])]
 
     def handle_connect(self, data):
         self.neighbor_id = data['id']
@@ -324,6 +337,58 @@ class NodeConnection(Thread):
         return f"NodeConn({self.node.id}, {self.neighbor_id})"
 
 
+class NodeLink:
+    def __init__(self, node: Node, neighbor: Node, link: NodeLink = None):
+        self.node = node
+        self.neighbor = neighbor
+        self.link = link
+        # kept for compatibility with NodeConnection
+        self.terminate = False
+        self.neighbor_id = neighbor.id
+        self.neighbor_name = str(neighbor)
+
+    def send(self, msg):
+        if msg:
+            data = pickle.loads(msg)
+            if data and data['mtype'] == protocol.TRAIN_STEP:
+                self.link.handle_step(data['data'])
+            elif data and data['mtype'] == protocol.CONNECT:
+                self.link.handle_connect(data['data'])
+            elif data and data['mtype'] == protocol.DISCONNECT:
+                self.link.handle_disconnect(data['data'])
+            else:
+                log('error', f"{self.node.name}: Unknown type of message: {data['mtype']}.")
+        else:
+            log('error', f"{self.node.name}: Corrupted message.")
+
+    def handle_step(self, data):
+        self.node.params.exchanges += 1
+        if self.node.current_round <= data['t']:
+            if data['t'] in self.node.V:
+                self.node.V[data['t']].append((self.neighbor_id, data['update']))
+            else:
+                self.node.V[data['t']] = [(self.neighbor_id, data['update'])]
+
+    def handle_connect(self, data):
+        self.neighbor_id = data['id']
+
+    def handle_disconnect(self, data):
+        self.terminate = True
+        if self in self.node.neighbors:
+            self.node.neighbors.remove(self)
+
+    def stop(self):
+        self.terminate = True
+
+    #  Private methods --------------------------------------------------------
+
+    def __repr__(self):
+        return f"NodeLink({self.node.id}, {self.neighbor_id})"
+
+    def __str__(self):
+        return f"NodeLink({self.node.id}, {self.neighbor_id})"
+
+
 class Graph:
 
     def __init__(self, peers, topology, test_ds, args):
@@ -335,6 +400,7 @@ class Graph:
         self.test_ds = test_ds
         self.args = args
 
+    # @measure_energy
     def local_training(self, device='cpu', inference=True):
         t = time.time()
         log('event', 'Starting local training ...')
@@ -346,6 +412,7 @@ class Graph:
             log('info',
                 f"{peer} is performing local training on {len(peer.train.dataset)} samples of classes {set(classes)}.")
             histories[peer] = peer.fit(inference)
+            # peer.stop()
         t = time.time() - t
         log("success", f"Local training finished in {t:.2f} seconds.")
 
@@ -368,6 +435,7 @@ class Graph:
 
         return history
 
+    # @measure_energy
     def collaborative_training(self, learner, args):
         t = time.time()
         log('event', f'Starting collaborative training using {learner.name} ...')
@@ -382,6 +450,7 @@ class Graph:
         for peer in self.peers:
             if peer.current_exec is not None:
                 peer.current_exec.join()
+                del peer.current_exec
                 peer.current_exec = None
         t = time.time() - t
         if r:
@@ -440,3 +509,54 @@ class Graph:
 
     def __len__(self):
         return len(self.peers)
+
+
+class IONode:
+
+    def __init__(self, node: Node):
+        # TODO reduce deepcopy instructions
+        self.node = node
+        self.id = node.id
+        self.host = node.host
+        self.port = node.host
+        self.device = node.device
+        self.local_model = deepcopy(node.local_model)
+        self.optimizer = deepcopy(node.optimizer)
+        self.grads = deepcopy(node.grads)
+        self.model = deepcopy(node.model)
+        self.V = node.V
+        self.current_round = node.current_round
+        self.current_exec = node.current_exec
+        self.neighbors_ids = node.neighbors_ids
+        self.neighbors = node.neighbors
+        self.in_neighbors = node.neighbors
+        self.clustered = node.clustered
+        self.similarity = node.similarity
+        self.train = node.train
+        self.val = node.val
+        self.test = node.test
+        self.inference = node.inference
+        self.terminate = node.terminate
+        self.params = node.params
+
+    def train_one_epoch(self, batches=1, evaluate=False):
+        return self.node.train_one_epoch(batches=batches, evaluate=evaluate)
+
+    def connect(self, neighbor: Node):
+        return self.node.connect(neighbor=neighbor)
+
+    def disconnect(self, neighbor_conn: NodeConnection):
+        self.node.disconnect(neighbor_conn=neighbor_conn)
+
+    def broadcast(self, msg, active=None):
+        return self.node.broadcast(msg=msg, active=active)
+
+    def stop(self):
+        self.node.stop()
+
+    # Special methods
+    def __repr__(self):
+        return f"IONode({self.id})"
+
+    def __str__(self):
+        return f"IONode({self.id})"

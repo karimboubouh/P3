@@ -1,20 +1,19 @@
-import sys
+import argparse
+import random
 import socket
 import time
 from functools import partial
+from itertools import combinations
+from random import shuffle
 
 import numpy as np
-import argparse
 import torch
-
-from random import shuffle
+from scipy.spatial import distance
 from termcolor import cprint
 from torch.utils.data.dataloader import DataLoader, default_collate
-from itertools import combinations
-from scipy.spatial import distance
 
 from src import conf
-from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE, TEST_SCOPE
+from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE
 from src.helpers import DatasetSplit, Map
 
 args: argparse.Namespace = None
@@ -36,14 +35,14 @@ def exp_details(args):
     print(f'    Epochs     : {args.epochs}')
     print(f'    Batch size : {args.batch_size}')
     print('Collaborative learning parameters:')
-    iid = 'IID' if args.iid else 'Non-IID'
-    size = 'Unequal' if args.unequal else 'Equal'
-    print(f'    Data distribution  : {iid}')
-    print(f'    Data size          : {size} data size')
-    print(f'    Test scope         : {args.test_scope}')
-    print(f'    Number of peers    : {args.num_users}')
-    print(f'    Rounds             : {args.rounds}')
-    print(f'    Device             : {args.device}')
+    print(f'    Data distribution     : {"IID" if args.iid else "Non-IID"}')
+    print(f'    Data size             : {"Unequal" if args.unequal else "Equal"} data size')
+    print(f'    Test scope            : {args.test_scope}')
+    print(f'    Number of peers       : {args.num_users}')
+    print(f'    Rounds                : {args.rounds}')
+    print(f'    Communication channel : {"TCP" if args.mp else "Shared memory"}')
+    print(f'    Device                : {args.device}')
+    print(f'    Seed                  : {args.seed}')
 
     return
 
@@ -63,9 +62,9 @@ def args_parser():
                          average, median, krum, aksel')
     parser.add_argument('--epochs', type=int, default=10,
                         help="the number of local epochs: E")
-    parser.add_argument('--batch_size', type=int, default=256,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help="batch size: B")
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.1,
                         help='learning rate')
     parser.add_argument('--momentum', type=float, default=0.5,
                         help='SGD momentum (default: 0.5)')
@@ -89,6 +88,9 @@ def args_parser():
                         strided convolutions")
 
     # other arguments
+    parser.add_argument('--mp', type=int, default=1,
+                        help='Use message passing (MP) via sockets or shared \
+                        memory (SM). Default set to MP. Set to 0 for SM.')
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
                         of dataset")
     parser.add_argument('--test_scope', type=str, default='global', help="test \
@@ -97,7 +99,7 @@ def args_parser():
                         of classes")
     parser.add_argument('--gpu', default=None, help="To use cuda, set \
                         to a specific GPU ID. Default set to use CPU.")
-    parser.add_argument('--optimizer', type=str, default='adam', help="type \
+    parser.add_argument('--optimizer', type=str, default='sgd', help="type \
                         of optimizer")
     parser.add_argument('--iid', type=int, default=1,
                         help='Default set to IID. Set to 0 for non-IID.')
@@ -119,6 +121,14 @@ def load_conf():
     args = args_parser()
     args.device = set_device(args.gpu)
     return Map(vars(args))
+
+
+def fixed_seed(fixed=True):
+    global args
+    if fixed:
+        torch.manual_seed(args.seed)
+        random.seed(args.seed)
+        np.random.seed(args.seed)
 
 
 def log(mtype, message):
@@ -288,6 +298,8 @@ def train_val_test(train_ds, mask, args, ratio=None):
     train_mask = mask[:v1]
     val_mask = mask[v1:v2]
     test_mask = mask[v2:]
+    # print(DatasetSplit(train_ds, train_mask))
+    # exit()
     # create data loaders
     train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False)
@@ -300,7 +312,7 @@ def inference_ds(peer, args):
     # global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
     test = None
     if args.test_scope == 'global':
-        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
+        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, num_workers=0)
     elif args.test_scope == 'neighborhood':
         collate = partial(collate_fn, scope=peer.neighborhood_data_scope())
         test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, collate_fn=collate)

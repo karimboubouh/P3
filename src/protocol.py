@@ -20,10 +20,10 @@ def disconnect(node_id):
     })
 
 
-def train_step(t, vi):
+def train_step(t, update):
     return pickle.dumps({
         'mtype': TRAIN_STEP,
-        'data': {'t': t, 'vi': vi},
+        'data': {'t': t, 'update': update},
     })
 
 

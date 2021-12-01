@@ -33,6 +33,9 @@ def initialize_models(args, same=False):
         # Multi-layer perceptron
         if args.dataset == 'mnist':
             modelClass = FFNMnist
+        elif args.dataset == 'cifar':
+            log('error', f"Model <MLP> is not compatible with <CIFAR> dataset.")
+            exit(0)
         else:
             modelClass = MLP
     elif args.model == 'linear':
@@ -123,6 +126,26 @@ class ModelBase(nn.Module, ABC):
         else:
             outputs = [self.validation_step(batch, device) for batch in val_loader]
         return self.validation_epoch_end(outputs)
+
+    def get_vector(self, numpy=False):
+        vector = []
+        for param in self.parameters():
+            if numpy:
+                vector.append(param.view(-1).detach().numpy())
+            else:
+                vector.append(param.view(-1))
+        return torch.cat(vector)
+
+    def load_vector(self, vector, numpy=False):
+        start = 0
+        if numpy:
+            vector = torch.as_tensor(vector)
+        with torch.no_grad():
+            for param in self.parameters():
+                end = start + param.view(-1).shape[0]
+                param.copy_(torch.reshape(vector[start:end], param.shape))
+                start = end
+        return self
 
 
 #  Model Modules --------------------------------------------------------------
