@@ -1,4 +1,4 @@
-# Biased Personalized P2P Machine Learning
+# Robust and Energy Efficient P2P Personalized Machine Learning in Heterogeneous Environments
 
 ### Example of running the code
 
