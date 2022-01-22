@@ -1,5 +1,8 @@
+import numpy as np
 import torch
 from torch.utils.data import Dataset
+
+from src.conf import DATASET_DUPLICATE
 
 
 class DatasetSplit(Dataset):
@@ -7,6 +10,8 @@ class DatasetSplit(Dataset):
     """
 
     def __init__(self, dataset, idxs):
+        if DATASET_DUPLICATE:
+            dataset, idxs = self.times_dataset(dataset, idxs, times=DATASET_DUPLICATE)
         self.dataset = dataset
         self.idxs = [int(i) for i in idxs]
 
@@ -14,9 +19,22 @@ class DatasetSplit(Dataset):
         return len(self.idxs)
 
     def __getitem__(self, item):
+        if DATASET_DUPLICATE:
+            while item > 60000:
+                item -= 60000
         image, label = self.dataset[self.idxs[item]]
         # return torch.tensor(image), torch.tensor(label)
         return image.clone().detach(), torch.tensor(label)
+
+    @staticmethod
+    def times_dataset(dataset, idxs, times=1):
+        _dataset = None
+        _idxs = []
+        for i in range(times):
+            _dataset = dataset if _dataset is None else _dataset + dataset
+            _idxs += list(np.array(idxs) + i * len(dataset))
+
+        return _dataset, _idxs
 
 
 class Map(dict):

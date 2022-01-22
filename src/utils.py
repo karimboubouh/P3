@@ -298,8 +298,6 @@ def train_val_test(train_ds, mask, args, ratio=None):
     train_mask = mask[:v1]
     val_mask = mask[v1:v2]
     test_mask = mask[v2:]
-    # print(DatasetSplit(train_ds, train_mask))
-    # exit()
     # create data loaders
     train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False)
@@ -425,6 +423,7 @@ def get_node_conn_by_id(node, node_id):
             return conn
     return None
 
+
 # def angular_metric(u, v):
 #     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 #     sim = cos(u, v)
@@ -433,3 +432,5 @@ def get_node_conn_by_id(node, node_id):
 #     distance = 1 - similarity
 #
 #     return angle, similarity, distance
+
+

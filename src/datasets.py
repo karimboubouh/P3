@@ -19,7 +19,7 @@ def get_dataset(args):
     each of those users.
     """
     if args.dataset == 'mnist':
-        data_dir = '../data33/mnist/'
+        data_dir = './data/mnist/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))  # mean/std over 1 channel
@@ -46,7 +46,7 @@ def get_dataset(args):
                 user_groups = mnist_noniid(train_dataset, args.num_users)
 
     elif args.dataset == 'cifar':
-        data_dir = '../data33/cifar/'
+        data_dir = './data/cifar/'
         apply_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # mean/std over 3 channels

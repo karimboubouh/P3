@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from src import protocol
 from src.aggregators import GAR
-from src.conf import EVAL_ROUND
+from src.conf import EVAL_ROUND, WAIT_TIMEOUT, WAIT_INTERVAL
 from src.filters import angular_metric
 from src.p2p import Graph, Node
 from src.utils import log, inference_eval, active_peers, wait_until, get_node_conn_by_id
@@ -26,20 +26,19 @@ def collaborate(graph: Graph, args):
     graph.join()
 
     log("info", f"Collaborative training for T = {graph.args.rounds} rounds")
-    # run the algorithm for T rounds
-    # T = tqdm(range(graph.args.rounds), position=0)
-    # r = time.time()
-    # for t in T:
-    #     for peer in graph.peers:
-    #         peer.execute(train_step, t, graph.PSS)
-    #     graph.join(t)
-    # r = time.time() - r
-    # log("info", f"train_step took {r:.2f} seconds.")
-
-    for peer in graph.peers:
-        T = tqdm(range(graph.args.rounds), position=0, desc=f"{peer}")
-        peer.execute(train_step, T, graph.PSS)
-    graph.join()
+    # OPTION I: Controlled training -------------------------------------------
+    T = tqdm(range(graph.args.rounds), position=0)
+    r = time.time()
+    for t in T:
+        for peer in graph.peers:
+            peer.execute(train_step, t, graph.PSS)
+        graph.join(t)
+    log("info", f"train_step took {(time.time() - r):.2f} seconds.")
+    # OPTION II: Uncontrolled training ----------------------------------------
+    # for peer in graph.peers:
+    #     T = tqdm(range(graph.args.rounds), position=0, desc=f"{peer}")
+    #     peer.execute(train_step, T, graph.PSS)
+    # graph.join()
 
     # stop train
     log("info", f"Evaluating the output of the collaborative training.")
@@ -85,15 +84,17 @@ def train_step(peer, t, PSS):
         msg = protocol.train_step(t, peer.model.get_vector())
         peer.broadcast(msg, active)
         # wait for enough updates labeled with round number t
-        wait_until(enough_received, 1, 0.02, peer, t, len(active))
+        wait_until(enough_received, WAIT_TIMEOUT, WAIT_INTERVAL, peer, t, len(active))
         if t not in peer.V:
             peer.V[t] = []
-            log('error', f"{peer} received no messages in round {t}")
+            log('error', f"{peer} received no messages in round {t}.")
         else:
-            log('log', f"{peer} -- T= {t} -- Got enough messages : {len(peer.V[t])}.")
+            log('log', f"{peer} got {len(peer.V[t])}/{len(active)} messages in round {t}.")
         # collaborativeUpdate
         w_t = collaborativeUpdateLight(peer, t)
         # update and evaluate the model
+        if isinstance(T, tqdm):
+            T.set_postfix_str(f"{peer} running evaluation in round {t}..." if (t % EVAL_ROUND) == 0 else "")
         # TODO Review update function
         update_model(peer, w_t, evaluate=(t % EVAL_ROUND == 0))
         # start accepting gradients from next round
@@ -150,7 +151,7 @@ def collaborativeUpdateLight(peer, t):
     return w_gar
 
 
-def update_model(peer, w_gar, evaluate=True):
+def update_model(peer, w_gar, evaluate=False):
     peer.model.load_vector(w_gar)
     # TODO Review update function
     # peer.take_step()

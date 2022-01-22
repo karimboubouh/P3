@@ -1,6 +1,7 @@
 import os
 import time
 
+from src.conf import IDLE_POWER
 from src.utils import log
 
 
@@ -50,8 +51,11 @@ def post_execution(t, filename="/tmp/measure_energy.tmp"):
             elif "StdDev" in line:
                 std = line.strip().split('  ')[-2:]
     os.remove(powerstat_file)
-    # print the results
+    # print the results // idle_state = 13.13
+    program_power = float(avg[0]) - IDLE_POWER
     log('result', f"Execution time          : {t:.2f} Seconds")
-    log('', f"Average Power           : {avg[0]} Watts; (StdDev of {std[0]} Watts)")
-    log('', f"Average Frequency       : {avg[1]}; (StdDev of {std[1]})")
-    log('', f"Average Energy consumed : {t * float(avg[0]):.2f} J; (StdDev of {t * float(std[0]):.2f} J)")
+    log('', f"Average Power usage           : {avg[0]} Watts; (StdDev of {std[0]} Watts)")
+    log('', f"Average Program power usage   : {program_power:.2f} Watts; (StdDev of {std[0]} Watts)")
+    log('', f"Average Frequency             : {avg[1].strip()}; (StdDev of {std[1]})")
+    log('', f"Average Energy                : {t * float(avg[0]):.2f} J; (StdDev of {t * float(std[0]):.2f} J)")
+    log('', f"Average Program Energy        : {t * program_power:.2f} J; (StdDev of {t * float(std[0]):.2f} J)")

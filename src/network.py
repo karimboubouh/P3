@@ -1,3 +1,4 @@
+import time
 from copy import deepcopy
 from time import sleep
 from typing import List
@@ -100,6 +101,7 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args):
 
 
 def connect_to_neighbors(peers: List[Node]):
+    t = time.time()
     connected = True
     for peer in peers:
         neighbors = [p for p in peers if p.id in peer.neighbors_ids]
@@ -109,7 +111,7 @@ def connect_to_neighbors(peers: List[Node]):
                 connected = False
         sleep(0.01)
     if connected:
-        log('success', f"Peers successfully connected with their neighbors.")
+        log('success', f"Peers successfully connected with their neighbors in {time.time() - t} seconds.")
     else:
         log('error', f"Some peers could not connect with their neighbors.")
 

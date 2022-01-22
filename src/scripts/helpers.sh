@@ -7,7 +7,9 @@ TIMEFORMAT="%Rs"
 MAX_FREQ="3.6Ghz"
 AVG_FREQ="1.9Ghz"
 MIN_FREQ="1.2Ghz"
-IDLE_TIME=600
+IDLE_TIME=60
+AVG_IDLE_POWER=12.55
+STD_IDLE_POWER=0.30
 
 cecho() {
   BOLD="\033[1m"
@@ -20,6 +22,13 @@ cecho() {
   NC="\033[0m" # No Color
 
   printf "${!1:-}${3:-"➜ "}${2} ${NC}\n"
+}
+
+average(){
+  arr=("$@")
+  sum=$(IFS="+";bc<<<"${arr[*]}")
+  mean=$(bc <<< "scale=2; $sum/${#arr[@]}")
+  echo "$mean"
 }
 
 usage() {
@@ -165,42 +174,57 @@ idle_powerstat() {
   cecho GREEN "******************** IDLE POWER USAGE ********************************\n" "\n"
   cecho D "Calculating power usage of the CPUs in idle state for $IDLE_TIME seconds ..."
   idle_file="./out/${UUID}_${performance}/idle.log"
-   powerstat 1 $IDLE_TIME -Rf 2>&1 | tee $idle_file
-#  powerstat 1 $IDLE_TIME -Rf >$idle_file
-  avg=($(grep "Average" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
-  std=($(grep "StdDev" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
-  cecho GREEN "Average Idle Power      : ${avg[0]} Watts; (StdDev of ${std[0]} Watts)."
-  cecho GREEN "Average Frequency       : ${avg[1]} Ghz; (StdDev of ${std[1]} Ghz)."
-  avgJ=$(echo "${avg[0]} * $IDLE_TIME" | bc)
-  stdJ=$(echo "${std[0]} * $IDLE_TIME" | bc)
-  cecho YELLOW "Average Energy consumed : $avgJ J; (StdDev of $stdJ J)."
+  powerstat 1 $IDLE_TIME -Rf 2>&1 | tee $idle_file
+  #  powerstat 1 $IDLE_TIME -Rf >$idle_file
+  avgIdle=($(grep "Average" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
+  stdIdle=($(grep "StdDev" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
+  cecho GREEN "Average Idle Power      : ${avgIdle[0]} Watts; (StdDev of ${stdIdle[0]} Watts)."
+  cecho GREEN "Average Frequency       : ${avgIdle[1]} Ghz; (StdDev of ${stdIdle[1]} Ghz)."
+  avgJIdle=$(echo "${avgIdle[0]} * $IDLE_TIME" | bc)
+  stdJIdle=$(echo "${stdIdle[0]} * $IDLE_TIME" | bc)
+  cecho YELLOW "Average Energy consumed : $avgJIdle J; (StdDev of $stdJIdle J)."
 }
 
 multi_run() {
-  #  avgP=${avg[0]:-12.78}
-  #  stdP=${std[0]:-0.27}
-  #  execution_times=()
+  # Default Idle power usage if idle_powerstat() was not executed.
+  avgIP=${avgIdleWW[0]:-$AVG_IDLE_POWER}
+  stdIP=${stdIdleWW[0]:-$STD_IDLE_POWER}
+  # List of execution times
   T=()
+  # List of average power usages
   P=()
+  # List of average power usages
+  PP=()
+  # List of average CPU frequencies
   F=()
+  # List of energy consumptions
   E=()
+
   for ((i = 1; i <= runs; i++)); do
     cecho GREEN "******************** RUN Nº $i ****************************************\n" "\n"
-    run_program "$i"
+    run_program "$i" "$avgIP"
     T+=("$elapsed")
     P+=("${avg[0]}")
+    PP+=("$program_power")
     F+=("${avg[1]}")
-    E+=("$avgJ")
+    E+=("$program_energy")
     cecho CYAN "Program running for round $i ended in $elapsed seconds."
   done
-
-  cecho BLUE "${T[*]}"
-  cecho RED "${P[*]}"
-  cecho CYAN "${F[*]}"
-  cecho YELLOW "${E[*]}"
+  printf "\n\n"
+  cecho GREEN "  Experiment results summary: " "\t"
+  cecho BLUE "-----------------------------------------------"
+  avg_time=$(average "${T[@]}")
+  stdJtime=$(echo "$stdIP * $avg_time" | bc)
+  cecho YELLOW "Average Execution Time      : $avg_time seconds."
+  cecho CYAN "Average Power Usage         : $(average "${P[@]}") Watts."
+  cecho CYAN "Average Program Power Usage : $(average "${PP[@]}") Watts."
+  cecho YELLOW "Average CPU Frequency       : $(average "${F[@]}") GHz."
+  cecho CYAN "Average Energy Consumed     : $(average "${E[@]}") (+- $stdJtime) Joules."
+  cecho BLUE "-----------------------------------------------"
 }
 
 run_program() {
+  idleP=$2
   cecho D "Waiting for $delay seconds before starting the execution ..."
   filename="./out/${UUID}_${performance}/execution_$1.log"
   powerstat 1 600000 -Rf -d "$delay" >"$filename" &
@@ -216,39 +240,26 @@ run_program() {
   kill -SIGTERM $pPid
   kill -SIGQUIT $pPid
   sleep 1
+  printf "\n"
   avg=($(grep "Average" $filename | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
   std=($(grep "StdDev" $filename | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
-  cecho GREEN "Average Power            : ${avg[0]} Watts; (StdDev of ${std[0]} Watts)."
-  cecho GREEN "Average Frequency        : ${avg[1]} Ghz; (StdDev of ${std[1]} Ghz)."
+  cecho GREEN "Average Frequency                      : ${avg[1]} Ghz; (StdDev of ${std[1]} Ghz)."
+  cecho GREEN "Average Power usage                    : ${avg[0]} Watts; (StdDev of ${std[0]} Watts)."
   avgJ=$(echo "${avg[0]} * $elapsed" | bc)
   stdJ=$(echo "${std[0]} * $elapsed" | bc)
-  cecho YELLOW "Average Energy consumed  : $avgJ J; (StdDev of $stdJ J)."
-}
-
-idle_powerstat______hello() {
-  cecho GREEN "******************** IDLE POWER USAGE ********************************\n" "\n"
-  cecho D "Calculating power usage of the CPUs in idle state for $IDLE_TIME seconds ..."
-  idle_file="./out/${UUID}_idle.log"
-  # powerstat 1 $IDLE_TIME -Rf 2>&1 | tee $idle_file &
-  powerstat 1 $IDLE_TIME -Rf >$idle_file &
-  pPid=$!
-  echo $pPid
-  sleep 15
-  kill -SIGINT "$pPid"
-  avg=($(grep "Average" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
-  std=($(grep "StdDev" $idle_file | grep -Eo '[0-9]+([.][0-9]+)?' | tail -2))
-  cecho GREEN "Average Idle Power: ${avg[0]} Watts; (StdDev of ${std[0]} Watts)."
-  cecho GREEN "Average Frequency : ${avg[1]} Ghz; (StdDev of ${std[1]} Ghz)."
-  avgJ=$(echo "${avg[0]} * $IDLE_TIME" | bc)
-  stdJ=$(echo "${std[0]} * $IDLE_TIME" | bc)
-  cecho YELLOW "Average Energy consumed : $avgJ J; (StdDev of $stdJ J)."
+  cecho GREEN "Average Energy consumed                : $avgJ J; (StdDev of $stdJ J)."
+  printf "\n"
+  program_power=$(echo "${avg[0]} - $idleP" | bc)
+  program_energy=$(echo "$program_power * $elapsed" | bc)
+  cecho YELLOW "Average Power usage of the program     : $program_power Watts; (StdDev of ${std[0]} Watts)."
+  cecho YELLOW "Average Energy consumed by the program : $program_energy J; (StdDev of $stdJ J)."
 }
 
 reset_configurations() {
   cecho YELLOW "Restoring default configurations"
-#  sudo chmod -r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+  #  sudo chmod -r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
   deactivate
   sudo cset shield --reset
-  sudo cpupower --cpu all frequency-set -g ondemand  -d $MIN_FREQ -u $MAX_FREQ
+  sudo cpupower --cpu all frequency-set -g ondemand -d $MIN_FREQ -u $MAX_FREQ
   cecho GREEN "Program terminated."
 }

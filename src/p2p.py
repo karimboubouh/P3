@@ -14,8 +14,12 @@ import torch
 
 from src import protocol
 from src.conf import HOST, PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN
+from src.datasets import get_dataset
 from src.helpers import Map
-from src.utils import optimizer_func, log, inference_eval, inference_ds, create_tcp_socket
+from src.measure_energy import measure_energy
+from src.models import initialize_models
+from src.profiler import profiler
+from src.utils import optimizer_func, log, inference_eval, inference_ds, create_tcp_socket, train_val_test
 
 
 class Node(Thread):
@@ -400,7 +404,33 @@ class Graph:
         self.test_ds = test_ds
         self.args = args
 
+    @staticmethod
+    def centralized_training(args, inference=True):
+        t = time.time()
+        log('event', 'Centralized training ...')
+        args.num_users = 1
+        args.iid = 1
+        args.unequal = 0
+        args.iid = 1
+        args.rounds = 0
+        log('info', f"Loading {args.dataset} dataset")
+        train_ds, test_ds, user_groups = get_dataset(args)
+        train, val, test = train_val_test(train_ds, user_groups[0], args)
+        data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
+        log('info', f"Initializing {args.model} model.")
+        models = initialize_models(args, same=True)
+        server = Node(0, models[0], data, [], False, {}, args)
+        server.inference = inference_ds(server, args)
+        log('info', f"Start server training on {len(server.train.dataset)} samples ...")
+        history = server.fit(inference)
+        server.stop()
+        t = time.time() - t
+        log("success", f"Centralized training finished in {t:.2f} seconds.")
+
+        return [history]
+
     # @measure_energy
+    # @profiler
     def local_training(self, device='cpu', inference=True):
         t = time.time()
         log('event', 'Starting local training ...')
@@ -436,6 +466,7 @@ class Graph:
         return history
 
     # @measure_energy
+    # @profiler
     def collaborative_training(self, learner, args):
         t = time.time()
         log('event', f'Starting collaborative training using {learner.name} ...')
@@ -453,7 +484,7 @@ class Graph:
                 del peer.current_exec
                 peer.current_exec = None
         t = time.time() - t
-        if r:
+        if r is not None:
             log("log", f"Round {r}: {name} joined in {t:.2f} seconds.")
         else:
             log("success", f"{name} joined in {t:.2f} seconds.")
