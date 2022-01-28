@@ -1,9 +1,75 @@
+"""
+file    : models_pytorch.py
+desc    : contains PyTorch models implementations
+classes : - MLP
+          - CNNMnist
+          - CNNFashion_Mnist
+          - CNNCifar
+          - ModelBased
+"""
+import copy
 from abc import ABC
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from src.utils import log
+
+
+def initialize_models(args, same=False):
+    # INITIALIZE PEERS MODELS
+    models = []
+    modelClass = None
+    if args.model == 'cnn':
+        # Convolutional neural network
+        if args.dataset == 'mnist':
+            modelClass = CNNMnist
+        elif args.dataset == 'fmnist':
+            modelClass = CNNFashionMnist
+        elif args.dataset == 'cifar':
+            modelClass = CNNCifar
+    elif args.model == 'mlp':
+        # Multi-layer perceptron
+        if args.dataset == 'mnist':
+            modelClass = FFNMnist
+        elif args.dataset == 'cifar':
+            log('error', f"Model <MLP> is not compatible with <CIFAR> dataset.")
+            exit(0)
+        else:
+            modelClass = MLP
+    elif args.model == 'linear':
+        modelClass = LogisticRegression
+    else:
+        exit('Error: unrecognized model')
+
+    if same:
+        # Initialize all models with same weights
+        model = None
+        if args.model == 'cnn':
+            model = modelClass(args=args)
+        else:
+            len_in = 28 * 28
+            model = modelClass(dim_in=len_in, dim_out=args.num_classes)
+        for i in range(args.num_users):
+            models.append(copy.deepcopy(model))
+        return models
+
+    else:
+        # Independent initialization
+        for i in range(args.num_users):
+            model = None
+            if args.model == 'cnn':
+                model = modelClass(args=args)
+            else:
+                len_in = 28 * 28
+                model = modelClass(dim_in=len_in, dim_out=args.num_classes)
+            models.append(model)
+
+    for model in models:
+        model.to(args.device)
+
+    return models
 
 
 # -- Base Model ---------------------------------------------------------------

@@ -43,6 +43,7 @@ class Model(object):
                 print('Repeated Layer Name: {}!'.format(name))
                 exit(1)
         self.print_structure()
+        return self
 
     def fit(self, train_x_set, train_y_set):
         self.__train_x_set = train_x_set
@@ -200,6 +201,16 @@ class Model(object):
 
     def __loss_of_current(self):
         return self.__e[self.__layer_name_lst[-1]]
+
+    def __repr__(self):
+        to_string = ""
+        for i in range(len(self.__layer_name_lst)):
+            to_string += f"{self.name}:Layer[{self.__layer_name_lst[i]}] Output Dim={self.__layer_output_dim_lst[i]}\n"
+
+        return to_string
+
+    def __str__(self):
+        return self.__repr__()
 
 
 if __name__ == '__main__':
