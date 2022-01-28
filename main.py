@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # =================================
     args.mp = 0
     args.num_users = 300
-    args.epochs = 2
+    args.epochs = 1
     args.batch_size = 16  # 128
     args.iid = 1
     args.unequal = 0

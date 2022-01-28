@@ -423,6 +423,11 @@ class Graph:
         server.inference = inference_ds(server, args)
         log('info', f"Start server training on {len(server.train.dataset)} samples ...")
         history = server.fit(inference)
+
+        for name, param in server.model.named_parameters():
+            if param.requires_grad:
+                print(f"{name}:\n{param.data}")
+
         server.stop()
         t = time.time() - t
         log("success", f"Centralized training finished in {t:.2f} seconds.")
