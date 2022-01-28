@@ -419,6 +419,8 @@ class Graph:
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
         log('info', f"Initializing {args.model} model.")
         models = initialize_models(args, same=True)
+        print(models[0])
+        exit()
         server = Node(0, models[0], data, [], False, {}, args)
         server.inference = inference_ds(server, args)
         log('info', f"Start server training on {len(server.train.dataset)} samples ...")

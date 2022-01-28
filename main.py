@@ -53,3 +53,11 @@ if __name__ == '__main__':
     # plot_train_history(collab_logs, metric='accuracy', measure="mean")
     print("END.")
     # os._exit(1)
+
+    if ML_ENGINE.lower() == "pytorch":
+        ml = importlib.import_module("src.model.models_pytorch")
+    elif ML_ENGINE.lower() == "numpy":
+        ml = importlib.import_module("src.model.models_numpy")
+    else:
+        log('error', f"Unknown ML engine <{ML_ENGINE}>")
+        exit(0)

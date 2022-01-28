@@ -26,7 +26,7 @@ def initialize_models(args, same=False):
         if args.dataset == 'mnist':
             modelClass = CNNMnist
         elif args.dataset == 'fmnist':
-            modelClass = CNNFashion_Mnist
+            modelClass = CNNFashionMnist
         elif args.dataset == 'cifar':
             modelClass = CNNCifar
     elif args.model == 'mlp':
@@ -219,9 +219,9 @@ class CNNMnist(ModelBase):
         return F.log_softmax(x, dim=1)
 
 
-class CNNFashion_Mnist(ModelBase):
+class CNNFashionMnist(ModelBase):
     def __init__(self, args):
-        super(CNNFashion_Mnist, self).__init__()
+        super(CNNFashionMnist, self).__init__()
         self.layer1 = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=5, padding=2),
             nn.BatchNorm2d(16),

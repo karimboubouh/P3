@@ -136,5 +136,4 @@ dmypy.json
 .idea/*
 .DS_Store
 playground
-playground/
-playground/*
+data
