@@ -140,7 +140,7 @@ class Model(object):
                 # todo save train loss/acc also
                 self.__train_loss_log.append(_batch_train_loss)
                 self.__train_acc_log.append(_batch_train_acc)
-                logger('', "Epoch [{}] [{:.2f}s], val_loss: {:.4f}, val_acc: {:.4f}".format(e, t, loss, acc))
+                logger('info', "Epoch [{}] [{:.2f}s], val_loss: {:.4f}, val_acc: {:.4f}".format(e, t, loss, acc))
                 history.append({'val_loss': loss, 'val_acc': acc})
 
         return history

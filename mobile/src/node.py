@@ -267,10 +267,8 @@ class NodeConnection(Thread):
         try:
             self.node.params.exchanges += 1
         except Exception as e:
-            print(self)
-            print(self.node)
-            print(data)
-            print(self.node.params)
+            print("self.node.params.exchanges")
+            print("handle_step()")
             exit()
         if self.node.current_round <= data['t']:
             if data['t'] in self.node.V:
