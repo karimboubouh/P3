@@ -2,21 +2,6 @@ import numpy as np
 import torch
 
 
-def GAR(peer, grads, weighted=True):
-    # Weighted Gradients Aggregation rule
-    grads = torch.stack(grads)
-    if peer.params.gar == "average":
-        return average(grads)
-    elif peer.params.gar == "median":
-        return median(grads)
-    elif peer.params.gar == "aksel":
-        return aksel(grads)
-    elif peer.params.gar == "krum":
-        return krum(grads)
-    else:
-        raise NotImplementedError()
-
-
 def average(gradients):
     """ Aggregate the gradients using the average aggregation rule."""
     # Assertion
@@ -80,4 +65,5 @@ if __name__ == '__main__':
     # g = [[1, 2, 3], [4, 5, 6], [1, 2, 3], [1, 2, 3], [4, 5, 6], [1, 2, 3], [1, 2, 3]]
     g = [[1., 3., 4.], [9., 7., 6.], [5., 5., 5.]]
     tg = torch.tensor(g)
-    print(average(tg))
+    # print(median(tg))
+    print(np.mean(tg, 0))

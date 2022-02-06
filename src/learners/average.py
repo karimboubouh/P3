@@ -8,6 +8,8 @@ from src.p2p import Graph
 from src.utils import log
 
 name = "Average-based Collaborative Learner"
+# name = "Gradient Averaging Collaborative Learner"
+
 
 
 def collaborate(graph: Graph, device='cpu'):

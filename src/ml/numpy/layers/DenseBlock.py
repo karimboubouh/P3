@@ -2,6 +2,8 @@
 author: Kun Wang (Kenn)
 e-mail: iskenn7@gmail.com
 """
+import time
+
 import numpy as np
 
 

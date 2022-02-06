@@ -1,19 +1,17 @@
-"""
-author: Kun Wang (Kenn)
-e-mail: iskenn7@gmail.com
-"""
+import time
+
 import numpy as np
-from .ConvBlock import Conv2D
-from .PoolingBlock import MaxPooling2D
-from .FlattenBlock import Flatten
-from .DenseBlock import Dense
-from .ActivationBlock import Activation
-from .RNNBLock import BasicRNN
+
+from src.utils import log
+from .layers import *
 
 
 class Model(object):
     def __init__(self, name, input_dim, n_class=None):
         self.name = name
+        self.lr = 0.1
+        self.momentum = 0.9
+        self.batch_size = 64
         self.__n_class = n_class
         self.__input_dim = input_dim
         self.__z = {}
@@ -25,8 +23,10 @@ class Model(object):
 
         self.__train_x_set = None
         self.__train_y_set = None
-        # self.__test_x_set = None
-        # self.__test_y_set = None
+        self.__val_x_set = None
+        self.__val_y_set = None
+        self.__test_x_set = None
+        self.__test_y_set = None
 
         self.__train_loss_log = []
         self.__train_acc_log = []
@@ -42,12 +42,20 @@ class Model(object):
             else:
                 print('Repeated Layer Name: {}!'.format(name))
                 exit(1)
-        self.print_structure()
+        # self.print_structure()
         return self
 
-    def fit(self, train_x_set, train_y_set):
+    def train(self, train_x_set, train_y_set):
         self.__train_x_set = train_x_set
         self.__train_y_set = train_y_set
+
+    def val(self, val_x_set, val_y_set):
+        self.__val_x_set = val_x_set
+        self.__val_y_set = val_y_set
+
+    def test(self, test_x_set, test_y_set):
+        self.__test_x_set = test_x_set
+        self.__test_y_set = test_y_set
 
     def print_structure(self):
         for i in range(len(self.__layer_name_lst)):
@@ -63,6 +71,7 @@ class Model(object):
         for elem in params.items():
             yield elem
 
+    @property
     def parameters(self):
         params = []
         for layer_block in self.__layer_block_dct.values():
@@ -70,7 +79,15 @@ class Model(object):
                 params.extend(layer_block.get_weights().values())
         return params
 
-    def train(self, lr, momentum=0.9, max_epoch=1000, batch_size=64, shuffle=True, interval=100):
+    @parameters.setter
+    def parameters(self, params):
+        i = 0
+        for layer_block in self.__layer_block_dct.values():
+            if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
+                layer_block.set_weights({'w': params[i], 'b': params[i + 1]})
+                i += 2
+
+    def fit(self, lr, momentum=0.9, max_epoch=1000, batch_size=128, shuffle=True, evaluation=False, logger=None):
         """
         Training model by SGD optimizer.
         :param lr: learning rate
@@ -78,53 +95,109 @@ class Model(object):
         :param max_epoch: max epoch
         :param batch_size: batch size
         :param shuffle: whether shuffle training set
-        :param interval: print training log each interval
+        :param evaluation: evaluate model using eval set
+        :param logger: logger function
         :return: none
         """
+        history = []
+        self.lr = lr
+        self.momentum = momentum
+        self.batch_size = batch_size
         if self.__train_x_set is None:
             print("None data fit!")
             exit(1)
-        _vg = {}
+        _vg = {}  # change to an init function
         for layer_name, layer_block in zip(self.__layer_block_dct.keys(), self.__layer_block_dct.values()):
             if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
                 weight_shape = layer_block.weight_shape()
                 _vg[layer_name] = \
                     {weight_name: np.zeros(list(weight_shape[weight_name])) for weight_name in weight_shape}
-        batch_nums = len(self.__train_x_set) // batch_size
-        for e in range(max_epoch + 1):
-            if shuffle and e % batch_nums == 0:
+        batch_nums = len(self.__train_x_set) // self.batch_size
+
+        for e in range(max_epoch):
+            t = time.time()
+            if shuffle:
                 self.__shuffle_set(self.__train_x_set, self.__train_y_set)
-            start_index = e % batch_nums * batch_size
-            t_x = self.__train_x_set[start_index:start_index + batch_size]
-            t_y = self.__train_y_set[start_index:start_index + batch_size]
-            _g, _batch_train_loss, _batch_train_acc = self.__gradient(t_x, t_y)
+            for i in range(batch_nums):
+                start_index = i * self.batch_size
+                sub = range(start_index, start_index + self.batch_size)
+                t_x = self.__train_x_set[sub]
+                t_y = self.__train_y_set[sub]
+                _g, _batch_train_loss, _batch_train_acc = self.__gradient(t_x, t_y)
+                for layer_name, layer_block in zip(self.__layer_block_dct.keys(), self.__layer_block_dct.values()):
+                    if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
+                        for weight_name in _g[layer_name]:
+                            _vg[layer_name][weight_name] = self.momentum * _vg[layer_name][weight_name] \
+                                                           - self.lr * _g[layer_name][weight_name]
+                            _g[layer_name][weight_name] = -_vg[layer_name][weight_name]
+                self.__gradient_descent(_g)
+
+            if evaluation:
+                # todo add eval loss
+                # print the training log of whole training set rather than batch:
+                t = time.time() - t
+                loss, acc = self.evaluate(self.__val_x_set, self.__val_y_set)
+                # todo save train loss/acc also
+                self.__train_loss_log.append(_batch_train_loss)
+                self.__train_acc_log.append(_batch_train_acc)
+                logger('', "Epoch [{}] [{:.2f}s], val_loss: {:.4f}, val_acc: {:.4f}".format(e, t, loss, acc))
+                history.append({'val_loss': loss, 'val_acc': acc})
+
+        return history
+
+    def improve(self, batches=1, evaluation=False):
+        """
+        Improve the trained model with more rounds model by SGD optimizer.
+        :param batches:
+        :param evaluation: evaluate model using eval set
+        :return: none
+        """
+        _vg = {}  # change to an init function
+        for layer_name, layer_block in zip(self.__layer_block_dct.keys(), self.__layer_block_dct.values()):
+            if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
+                weight_shape = layer_block.weight_shape()
+                _vg[layer_name] = \
+                    {weight_name: np.zeros(list(weight_shape[weight_name])) for weight_name in weight_shape}
+
+        for i in range(batches):
+            batch_ids = np.random.choice(range(len(self.__train_x_set)), self.batch_size, replace=False)
+            b_x = self.__train_x_set[batch_ids]
+            b_y = self.__train_y_set[batch_ids]
+            _g, _batch_train_loss, _batch_train_acc = self.__gradient(b_x, b_y)
             for layer_name, layer_block in zip(self.__layer_block_dct.keys(), self.__layer_block_dct.values()):
                 if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
                     for weight_name in _g[layer_name]:
-                        _vg[layer_name][weight_name] = momentum * _vg[layer_name][weight_name] \
-                                                       - lr * _g[layer_name][weight_name]
+                        _vg[layer_name][weight_name] = self.momentum * _vg[layer_name][weight_name] \
+                                                       - self.lr * _g[layer_name][weight_name]
                         _g[layer_name][weight_name] = -_vg[layer_name][weight_name]
             self.__gradient_descent(_g)
-            if interval and e % interval == 0:
-                # print the training log of whole training set rather than batch:
-                # train_acc = self.measure(self.__train_x_set, self.__train_y_set)
-                self.__train_loss_log.append(_batch_train_loss)
-                self.__train_acc_log.append(_batch_train_acc)
-                print('Epoch[{}] Batch[{}] Batch_Train_Loss=[{}] Batch_Train_Acc=[{}]'
-                      .format(e, e % batch_nums, _batch_train_loss, _batch_train_acc))
+
+        if evaluation:
+            loss, acc = self.evaluate(self.__val_x_set, self.__val_y_set)
+            return {'val_loss': loss, 'val_acc': acc}
+
+        return None
 
     def predict(self, _x_set):
         self.__forward(_x_set)
         return np.argmax(self.__z[self.__layer_name_lst[-1]], axis=-1)
 
-    def measure(self, _x_set, _target_set):
-        _prd_set = self.predict(_x_set)
-        _target_set = np.argmax(_target_set, axis=-1)
-        _acc = 0
+    def evaluate(self, _x_set, _target_set, one_batch=False):
+        if one_batch:
+            ids = np.random.choice(range(len(_target_set)), self.batch_size, replace=False)
+            _x_set = _x_set[ids]
+            _target_set = _target_set[ids]
+
+        self.__forward(_x_set)
+        self.__backward(_target_set)
+        loss = self.__loss_of_current() / len(_x_set)
+        acc = 0
         for i in range(len(_x_set)):
-            if _prd_set[i] == _target_set[i]:
-                _acc += 1
-        return _acc / len(_x_set)
+            if np.argmax(self.__z[self.__layer_name_lst[-1]][i]) == np.argmax(_target_set[i]):
+                acc += 1
+        acc /= len(_x_set)
+
+        return loss, acc
 
     def __forward(self, _x_set):
         temp_z_set = _x_set.copy()
@@ -176,6 +249,7 @@ class Model(object):
                 _e = self.__e[layer_name]
                 # _dw[layer_name], _db[layer_name] = layer_block.gradient(_z_down, _e)
                 _g[layer_name] = layer_block.gradient(_z_down, _e)
+
         return _g, _batch_train_loss, _batch_train_acc
 
     def __gradient_descent(self, _g):

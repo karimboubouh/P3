@@ -7,13 +7,13 @@ import torch
 from tqdm import tqdm
 
 from src import protocol
-from src.aggregators import GAR
+from src.ml import GAR, model_inference
 from src.conf import EVAL_ROUND, WAIT_TIMEOUT, WAIT_INTERVAL
 from src.filters import angular_metric
 from src.p2p import Graph, Node
-from src.utils import log, inference_eval, active_peers, wait_until, get_node_conn_by_id
+from src.utils import log, active_peers, wait_until, get_node_conn_by_id
 
-name = "Gradient Averaging Collaborative Learner"
+name = "P3 Algorithm"
 
 
 # ---------- MAlgorithm functions ----------------------------------------------
@@ -31,7 +31,7 @@ def collaborate(graph: Graph, args):
     r = time.time()
     for t in T:
         for peer in graph.peers:
-            peer.execute(train_step, t, graph.PSS)
+            peer.execute(train_step, t)  # , graph.PSS
         graph.join(t)
     log("info", f"train_step took {(time.time() - r):.2f} seconds.")
     # OPTION II: Uncontrolled training ----------------------------------------
@@ -59,7 +59,7 @@ def collaborate(graph: Graph, args):
 # ---------- Algorithm functions ----------------------------------------------
 
 def train_init(peer):
-    r = peer.model.evaluate(peer.inference, one_batch=True, device=peer.device)
+    r = peer.evaluate(peer.inference, one_batch=True)
     peer.params.logs = [r]
     peer.params.exchanges = 0
     peer.params.n_accept = 0
@@ -74,14 +74,14 @@ def train_init(peer):
     return
 
 
-def train_step(peer, t, PSS):
+def train_step(peer, t):  # , PSS
     T = t if isinstance(t, tqdm) or isinstance(t, range) else [t]
     for t in T:
         # train for E (one) epoch
         peer.train_one_epoch()
         # broadcast current model to all my active neighbors
         active = active_peers(peer.neighbors, peer.params.frac)
-        msg = protocol.train_step(t, peer.model.get_vector())
+        msg = protocol.train_step(t, peer.get_model_params())
         peer.broadcast(msg, active)
         # wait for enough updates labeled with round number t
         wait_until(enough_received, WAIT_TIMEOUT, WAIT_INTERVAL, peer, t, len(active))
@@ -105,7 +105,7 @@ def train_step(peer, t, PSS):
 
 
 def train_stop(peer):
-    inference_eval(peer, one_batch=True)
+    model_inference(peer, one_batch=True)
     # acceptance_rate = peer.params.n_accept / peer.params.exchanges * 100
     # log('info', f"{peer} Acceptance rate for alpha_max=({peer.params.alpha_max}): {acceptance_rate} %")
     peer.stop()
@@ -113,7 +113,7 @@ def train_stop(peer):
 
 
 def collaborativeUpdate(peer, t):
-    w_ref = peer.model.get_vector()
+    w_ref = peer.get_model_params()
     accepted = []
     rejected = []
     for j, w_j in peer.V[t]:
@@ -143,7 +143,7 @@ def collaborativeUpdate(peer, t):
 
 
 def collaborativeUpdateLight(peer, t):
-    w_ref = peer.model.get_vector()
+    w_ref = peer.get_model_params()
     accepted = [w_ref]
     for j, w_j in peer.V[t]:
         accepted.append(w_j)
@@ -152,18 +152,18 @@ def collaborativeUpdateLight(peer, t):
 
 
 def update_model(peer, w_gar, evaluate=False):
-    peer.model.load_vector(w_gar)
+    peer.set_model_params(w_gar)
     # TODO Review update function
     # peer.take_step()
     if evaluate:
-        t_eval = peer.model.evaluate(peer.inference, one_batch=True, device=peer.device)
+        t_eval = peer.evaluate(peer.inference, one_batch=True)
         peer.params.logs.append(t_eval)
 
 
 def networkUpdate(peer: Node, t, PSS, tolerate=True):
     if peer.params.e == t:
         if peer.id == 0:
-            r = peer.model.evaluate(peer.inference, peer.device, one_batch=True)
+            r = peer.evaluate(peer.inference, one_batch=True)
             log('info', f"{peer} > Round [{t}], val_loss: {r['val_loss']:.4f}, val_acc:  {r['val_acc']:.4f}")
         lowest = nsmallest(peer.params.k, peer.params.Wi, key=peer.params.Wi.get)
         new_neighbors = PSS(peer, len(lowest))  # return List[Node]
@@ -172,9 +172,9 @@ def networkUpdate(peer: Node, t, PSS, tolerate=True):
         if tolerate and leave > 0:
             del lowest[-leave:]
         # disconnect from neighbors with lowest Wi if they are still connected with the peer
-        for l in lowest:
-            del peer.params.Wi[l]
-            unwanted_peer = get_node_conn_by_id(peer, l)
+        for low in lowest:
+            del peer.params.Wi[low]
+            unwanted_peer = get_node_conn_by_id(peer, low)
             if unwanted_peer:
                 peer.disconnect(unwanted_peer)
         # connect to new peers
@@ -204,7 +204,7 @@ def get_update(peer, neighbor):
 def avg_step(peer, grad, history, device):
     peer.set_gradients(grad, device)
     peer.take_step()
-    r = peer.model.evaluate(peer.inference, one_batch=True, device=device)
+    r = peer.evaluate(peer.inference, one_batch=True)
     history[peer.id].append(r)
 
 
@@ -234,7 +234,7 @@ def run_evaluation(graph, history, epoch, debug=True, device='cpu'):
     t = time.time()
     current = []
     for peer in graph.peers:
-        r = peer.model.evaluate(peer.inference, one_batch=True, device=device)
+        r = peer.evaluate(peer.inference, one_batch=True)
         history[peer.id].append(r)
         current.append(r)
     if debug:

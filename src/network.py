@@ -1,15 +1,17 @@
 import time
 from copy import deepcopy
+from itertools import combinations
 from time import sleep
 from typing import List
 
 import numpy as np
-from itertools import combinations
 from scipy.spatial import distance
 
-from src.conf import PORT, HOST
+from src.edge_device import Bridge
+from src.helpers import Map
+from src.ml import train_val_test
 from src.p2p import Node, Graph
-from src.utils import cluster_peers, similarity_matrix, node_info, inference_ds, log
+from src.utils import cluster_peers, similarity_matrix, node_topology, log
 
 
 def random_graph(models, sigma=0.2, cluster_enabled=False, k=2, data=None):
@@ -82,20 +84,30 @@ def datasim_network(data, sigma=0.2):
     return adjacency, similarities
 
 
-def network_graph(topology, models, train_ds, test_ds, user_groups, args):
+def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge: Bridge):
     nbr_nodes = len(user_groups)
     clustered = True if len(topology['clusters']) > 1 else False
     peers = list()
+    t = time.time()
     for i in range(nbr_nodes):
-        neighbors_ids, similarity, train, val, test = node_info(i, topology, train_ds, user_groups[i], args)
-        data = {'train': train, 'val': val, 'test': test, 'inference': deepcopy(test_ds)}
-        peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
-        # peer.start()
-        peers.append(peer)
+        neighbors_ids, similarity = node_topology(i, topology)
+        train, val, test = train_val_test(train_ds, user_groups[i], args)
+        data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
+        if edge.is_edge_device(i):
+            device_bridge = edge.populate_device(i, models[i], data, neighbors_ids, clustered, similarity)
+            device_bridge.neighbors_ids = neighbors_ids
+            peers.append(device_bridge)
+        else:
+            peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
+            peer.start()
+            peers.append(peer)
     connect_to_neighbors(peers)
     graph = Graph(peers, topology, test_ds, args)
+    log('info', f"Network Graph constructed in {(time.time() - t):.4f} seconds")
+
     # Transformations
-    graph.set_inference(args)
+    # todo handle inference for BridgeDevices
+    # graph.set_inference(args)
 
     return graph
 
@@ -111,7 +123,7 @@ def connect_to_neighbors(peers: List[Node]):
                 connected = False
         sleep(0.01)
     if connected:
-        log('success', f"Peers successfully connected with their neighbors in {time.time() - t} seconds.")
+        log('success', f"Peers successfully connected with their neighbors in {(time.time() - t):.4f} seconds.")
     else:
         log('error', f"Some peers could not connect with their neighbors.")
 

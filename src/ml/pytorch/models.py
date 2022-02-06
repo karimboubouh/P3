@@ -1,5 +1,5 @@
 """
-file    : models_pytorch.py
+file    : models.py
 desc    : contains PyTorch models implementations
 classes : - MLP
           - CNNMnist
@@ -7,72 +7,15 @@ classes : - MLP
           - CNNCifar
           - ModelBased
 """
-import copy
 from abc import ABC
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# -- Base Model ---------------------------------------------------------------
 from src.utils import log
 
-
-def initialize_models(args, same=False):
-    # INITIALIZE PEERS MODELS
-    models = []
-    modelClass = None
-    if args.model == 'cnn':
-        # Convolutional neural network
-        if args.dataset == 'mnist':
-            modelClass = CNNMnist
-        elif args.dataset == 'fmnist':
-            modelClass = CNNFashionMnist
-        elif args.dataset == 'cifar':
-            modelClass = CNNCifar
-    elif args.model == 'mlp':
-        # Multi-layer perceptron
-        if args.dataset == 'mnist':
-            modelClass = FFNMnist
-        elif args.dataset == 'cifar':
-            log('error', f"Model <MLP> is not compatible with <CIFAR> dataset.")
-            exit(0)
-        else:
-            modelClass = MLP
-    elif args.model == 'linear':
-        modelClass = LogisticRegression
-    else:
-        exit('Error: unrecognized model')
-
-    if same:
-        # Initialize all models with same weights
-        model = None
-        if args.model == 'cnn':
-            model = modelClass(args=args)
-        else:
-            len_in = 28 * 28
-            model = modelClass(dim_in=len_in, dim_out=args.num_classes)
-        for i in range(args.num_users):
-            models.append(copy.deepcopy(model))
-        return models
-
-    else:
-        # Independent initialization
-        for i in range(args.num_users):
-            model = None
-            if args.model == 'cnn':
-                model = modelClass(args=args)
-            else:
-                len_in = 28 * 28
-                model = modelClass(dim_in=len_in, dim_out=args.num_classes)
-            models.append(model)
-
-    for model in models:
-        model.to(args.device)
-
-    return models
-
-
-# -- Base Model ---------------------------------------------------------------
 
 class ModelBase(nn.Module, ABC):
     """Shared methods between models"""
@@ -104,7 +47,8 @@ class ModelBase(nn.Module, ABC):
         acc = self.accuracy(out, labels)
         return {'val_loss': loss, 'val_acc': acc}
 
-    def validation_epoch_end(self, outputs):
+    @staticmethod
+    def validation_epoch_end(outputs):
         # calculate mean loss and accuracy of one epoch
         batch_losses = [x['val_loss'] for x in outputs]
         epoch_loss = torch.stack(batch_losses).mean()
@@ -112,10 +56,13 @@ class ModelBase(nn.Module, ABC):
         epoch_acc = torch.stack(batch_accs).mean()
         return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
 
-    def epoch_end(self, epoch, result):
-        log('', "Epoch [{}], val_loss: {:.4f}, val_acc: {:.4f}".format(epoch, result['val_loss'], result['val_acc']))
+    @staticmethod
+    def epoch_end(epoch, result, epoch_time=None):
+        t = f" [{epoch_time:.2f}s]" if epoch_time else ""
+        log('', f"Epoch [{epoch}]{t}, val_loss: {result['val_loss']:.4f}, val_acc: {result['val_acc']:.4f}")
 
-    def accuracy(self, outputs, labels):
+    @staticmethod
+    def accuracy(outputs, labels):
         _, preds = torch.max(outputs, dim=1)
         return torch.tensor(torch.sum(preds == labels).item() / len(preds))
 
@@ -127,7 +74,17 @@ class ModelBase(nn.Module, ABC):
             outputs = [self.validation_step(batch, device) for batch in val_loader]
         return self.validation_epoch_end(outputs)
 
-    def get_vector(self, numpy=False):
+    def get_named_params(self, numpy=False):
+        named = []
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                if numpy:
+                    named.append({name: param.view(-1).detach().numpy()})
+                else:
+                    named.append({name: param.view(-1)})
+        return named
+
+    def get_params(self, numpy=False):
         vector = []
         for param in self.parameters():
             if numpy:
@@ -136,7 +93,7 @@ class ModelBase(nn.Module, ABC):
                 vector.append(param.view(-1))
         return torch.cat(vector)
 
-    def load_vector(self, vector, numpy=False):
+    def set_params(self, vector, numpy=False):
         start = 0
         if numpy:
             vector = torch.as_tensor(vector)

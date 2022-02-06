@@ -13,13 +13,11 @@ import numpy as np
 import torch
 
 from src import protocol
-from src.conf import HOST, PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN
-from src.datasets import get_dataset
+from src.conf import HOST, PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ML_ENGINE
 from src.helpers import Map
-from src.measure_energy import measure_energy
-from src.models import initialize_models
-from src.profiler import profiler
-from src.utils import optimizer_func, log, inference_eval, inference_ds, create_tcp_socket, train_val_test
+from src.ml import get_dataset, train_val_test, inference_ds, evaluate_model, get_params, set_params, train_for_x_epoch
+from src.ml import initialize_models, model_fit, model_inference
+from src.utils import optimizer_func, log, create_tcp_socket, labels_set
 
 
 class Node(Thread):
@@ -52,6 +50,7 @@ class Node(Thread):
         self.params = Map({
             'frac': args.frac,
             'epochs': args.epochs,
+            'batch_size': args.batch_size,
             'lr': args.lr,
             'momentum': args.momentum,
             'opt_func': optimizer_func(args.optimizer),
@@ -122,6 +121,7 @@ class Node(Thread):
         for neighbor in self.neighbors:
             self.disconnect(neighbor)
         self.terminate = True
+        self.sock.close()
 
     def send(self, neighbor, msg):
         neighbor.send(msg)
@@ -143,50 +143,22 @@ class Node(Thread):
             return None
 
     def fit(self, inference=True):
-        history = []
-        self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)  # , 0.99
-        for epoch in range(self.params.epochs):
-            for batch in self.train:
-                # Train Phase
-                loss = self.model.train_step(batch, self.device)
-                loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-            # Validation Phase
-            result = self.model.evaluate(self.val, self.device)
-            self.model.epoch_end(epoch, result)
-            history.append(result)
-        if inference:
-            # evaluate against a batch of the inference dataset
-            inference_eval(self)
+        # train the model
+        history = model_fit(self)
         # set local model variable
         self.local_model = self.model
+        # evaluate against a one batch or the whole inference dataset
+        # history = None
+        if inference:
+            model_inference(self, one_batch=False)
+
         return history
 
     def train_one_epoch(self, batches=1, evaluate=False):
-        for i in range(batches):
-            # train for single batch randomly chosen when Dataloader is set with shuffle=True
-            batch = next(iter(self.train))
-            # execute one training step
-            if self.optimizer:
-                self.optimizer.zero_grad()
-            else:
-                self.optimizer = self.params.opt_func(self.model.parameters(), self.params.lr)
-            loss = self.model.train_step(batch, self.device)
-            loss.backward()
-            # TODO new verify
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-            # get gradients
-            grads = []
-            for param in self.model.parameters():
-                grads.append(param.grad.view(-1))
-            self.grads = torch.cat(deepcopy(grads))
+        return train_for_x_epoch(self, batches, evaluate)
 
-        return loss, grads
-
-    def evaluate(self, dataloader):
-        return self.model.evaluate(dataloader)
+    def evaluate(self, dataholder, one_batch=True):
+        return evaluate_model(self.model, dataholder, one_batch, device=self.device)
 
     def save_model(self):
         pass
@@ -204,6 +176,12 @@ class Node(Thread):
 
     def get_weights(self):
         return deepcopy(self.model.state_dict())
+
+    def get_model_params(self, named=False, numpy=False):
+        return get_params(self.model, named=named, numpy=numpy)
+
+    def set_model_params(self, params, named=False, numpy=False):
+        return set_params(self.model, params, named=named, numpy=numpy)
 
     def set_weights(self, w):
         self.model.load_state_dict(deepcopy(w))
@@ -316,7 +294,14 @@ class NodeConnection(Thread):
         self.terminate = True
 
     def handle_step(self, data):
-        self.node.params.exchanges += 1
+        try:
+            self.node.params.exchanges += 1
+        except Exception as e:
+            print(self)
+            print(self.node)
+            print(data)
+            print(self.node.params)
+            exit()
         if self.node.current_round <= data['t']:
             if data['t'] in self.node.V:
                 self.node.V[data['t']].append((self.neighbor_id, data['update']))
@@ -397,7 +382,7 @@ class Graph:
 
     def __init__(self, peers, topology, test_ds, args):
         self.device = args.device
-        self.peers = peers  # type: List[Node]
+        self.peers = peers
         self.clusters = topology['clusters']
         self.similarity = topology['similarities']
         self.adjacency = topology['adjacency']
@@ -407,6 +392,7 @@ class Graph:
     @staticmethod
     def centralized_training(args, inference=True):
         t = time.time()
+        log('warning', f'ML engine: {ML_ENGINE}')
         log('event', 'Centralized training ...')
         args.num_users = 1
         args.iid = 1
@@ -419,18 +405,10 @@ class Graph:
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
         log('info', f"Initializing {args.model} model.")
         models = initialize_models(args, same=True)
-        print("------------------")
-        print(models[0])
-        exit()
         server = Node(0, models[0], data, [], False, {}, args)
         server.inference = inference_ds(server, args)
         log('info', f"Start server training on {len(server.train.dataset)} samples ...")
         history = server.fit(inference)
-
-        for name, param in server.model.named_parameters():
-            if param.requires_grad:
-                print(f"{name}:\n{param.data}")
-
         server.stop()
         t = time.time() - t
         log("success", f"Centralized training finished in {t:.2f} seconds.")
@@ -444,11 +422,10 @@ class Graph:
         log('event', 'Starting local training ...')
         histories = dict()
         for peer in self.peers:
-            classes = []
-            for b in peer.train:
-                classes.extend(b[1].numpy())
-            log('info',
-                f"{peer} is performing local training on {len(peer.train.dataset)} samples of classes {set(classes)}.")
+            if isinstance(peer, Node):
+                labels = labels_set(peer.train)
+                log('info',
+                    f"{peer} is performing local training on {len(peer.train.dataset)} samples of labels {labels}.")
             histories[peer] = peer.fit(inference)
             # peer.stop()
         t = time.time() - t
@@ -485,12 +462,21 @@ class Graph:
 
     def join(self, r=None):
         t = time.time()
-        name = self.peers[0].current_exec.name
+        if isinstance(self.peers[0], Node):
+            name = self.peers[0].current_exec.name
+        else:
+            name = self.peers[0].current_exec
         for peer in self.peers:
-            if peer.current_exec is not None:
-                peer.current_exec.join()
-                del peer.current_exec
-                peer.current_exec = None
+            if isinstance(peer, Node):
+                if peer.current_exec is not None:
+                    peer.current_exec.join()
+                    del peer.current_exec
+                    peer.current_exec = None
+            else:
+                if peer.current_exec is not None:
+                    peer.wait_method(peer.current_exec)
+                    peer.current_exec = None
+
         t = time.time() - t
         if r is not None:
             log("log", f"Round {r}: {name} joined in {t:.2f} seconds.")
@@ -523,7 +509,10 @@ class Graph:
     def show_neighbors(self, verbose=False):
         log('info', "Neighbors list")
         for peer in self.peers:
-            log('', f"{peer} has: {len(peer.neighbors)} neighbors.")
+            if isinstance(peer, Node):
+                log('', f"{peer} has: {len(peer.neighbors)} neighbors.")
+            else:
+                log('', f"{peer} has: {len(peer.neighbors)} neighbors: {peer.neighbors}")
             if verbose:
                 # log('', f"{peer} neighbors: {peer.neighbors}")
                 log('',

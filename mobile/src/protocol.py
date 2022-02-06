@@ -17,27 +17,27 @@ def populate(info):
     return pickle.dumps({
         'mtype': POPULATE,
         'data': info,
-    }, protocol=pickle.HIGHEST_PROTOCOL)
+    })
 
 
 def preferences(pref):
     return pickle.dumps({
         'mtype': PREFERENCES,
         'data': pref,
-    }, protocol=pickle.HIGHEST_PROTOCOL)
+    })
 
 
 def connect(address, node_id):
     return pickle.dumps({
         'mtype': CONNECT,
         'data': {'address': address, 'id': node_id},
-    }, protocol=pickle.HIGHEST_PROTOCOL)
+    })
 
 
-def connect_to_neighbor(id, host, port):
+def connect_to_neighbor(host, port):
     return pickle.dumps({
         'mtype': CONNECT_TO_NEIGHBOR,
-        'data': {'id': id, 'host': host, 'port': port},
+        'data': {'host': host, 'port': port},
     }, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -52,7 +52,7 @@ def disconnect(node_id):
     return pickle.dumps({
         'mtype': DISCONNECT,
         'data': {'id': node_id},
-    }, protocol=pickle.HIGHEST_PROTOCOL)
+    })
 
 
 def call_method(method, *args, **kwargs):
@@ -73,7 +73,7 @@ def train_step(t, update):
     return pickle.dumps({
         'mtype': TRAIN_STEP,
         'data': {'t': t, 'update': update},
-    }, protocol=pickle.HIGHEST_PROTOCOL)
+    })
 
 
 def stop_train():

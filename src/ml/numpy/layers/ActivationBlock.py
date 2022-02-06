@@ -3,7 +3,7 @@ author: Kun Wang (Kenn)
 e-mail: iskenn7@gmail.com
 """
 import numpy as np
-from .utils import *
+from ..utils import *
 
 
 class Activation(object):

@@ -1,13 +1,9 @@
-"""
-author: Kun Wang (Kenn)
-e-mail: iskenn7@gmail.com
-"""
 import numpy as np
-from .utils import *
+from ..utils import *
 
 
 class BasicRNN(object):
-    """unidirection, static"""
+    """unidirectional, static"""
 
     def __init__(self, name, units, return_last_step):
         self.name = name

@@ -2,19 +2,16 @@ import argparse
 import random
 import socket
 import time
-from functools import partial
 from itertools import combinations
-from random import shuffle
 
 import numpy as np
 import torch
 from scipy.spatial import distance
 from termcolor import cprint
-from torch.utils.data.dataloader import DataLoader, default_collate
 
 from src import conf
-from src.conf import TRAIN_VAL_TEST_RATIO, INFERENCE_BATCH_SIZE
-from src.helpers import DatasetSplit, Map
+from src.conf import ML_ENGINE, TCP_SOCKET_BUFFER_SIZE
+from src.helpers import Map
 
 args: argparse.Namespace = None
 
@@ -43,6 +40,7 @@ def exp_details(args):
     print(f'    Communication channel : {"TCP" if args.mp else "Shared memory"}')
     print(f'    Device                : {args.device}')
     print(f'    Seed                  : {args.seed}')
+    log('info', f'Used ML engine: {ML_ENGINE}')
 
     return
 
@@ -66,8 +64,8 @@ def args_parser():
                         help="batch size: B")
     parser.add_argument('--lr', type=float, default=0.1,
                         help='learning rate')
-    parser.add_argument('--momentum', type=float, default=0.5,
-                        help='SGD momentum (default: 0.5)')
+    parser.add_argument('--momentum', type=float, default=0.9,
+                        help='SGD momentum (default: 0.9)')
 
     # model arguments
     parser.add_argument('--model', type=str, default='mlp', help='model name')
@@ -191,11 +189,12 @@ def log(mtype, message):
             log.old_type = 'info'
             return
     if args.verbose > 2:
-        if title:
-            cprint("\r Log:     ", 'magenta', attrs=['reverse'], end=' ', flush=True)
-        else:
-            cprint("          ", 'magenta', end=' ')
-        log.old_type = 'log'
+        if mtype not in ["info", "warning", "event", "success", "error", "result"]:
+            if title:
+                cprint("\r Log:     ", 'magenta', attrs=['reverse'], end=' ', flush=True)
+            else:
+                cprint("          ", end=' ')
+            log.old_type = 'log'
 
 
 # def partition(x, nb_nodes, cluster_data=True, method="random", random_state=None):
@@ -274,62 +273,11 @@ def similarity_matrix(mask, clusters, sigma=0.2, data=None):
     return adjacency, similarities
 
 
-def node_info(i, topology, train_ds, data_mask, args):
+def node_topology(i, topology):
     similarity = topology['similarities'][i]
     similarity = {key: value for key, value in enumerate(similarity) if value != 0}
     neighbors_ids = [j for j, adj in enumerate(topology['adjacency'][i]) if bool(adj) is True]
-    train, val, test = train_val_test(train_ds, data_mask, args)
-
-    return neighbors_ids, similarity, train, val, test
-
-
-def train_val_test(train_ds, mask, args, ratio=None):
-    """
-    Returns train, validation and test dataloaders for a given dataset
-    and user indexes.
-    """
-    ratio = TRAIN_VAL_TEST_RATIO if ratio is None else ratio
-    mask = list(mask)
-    shuffle(mask)
-    assert np.sum(ratio) == 1, "Ratio between train, dev and test must sum to 1."
-    v1 = int(ratio[0] * len(mask))
-    v2 = int((ratio[0] + ratio[1]) * len(mask))
-    # split indexes for train, validation, and test (80, 10, 10)
-    train_mask = mask[:v1]
-    val_mask = mask[v1:v2]
-    test_mask = mask[v2:]
-    # create data loaders
-    train_loader = DataLoader(DatasetSplit(train_ds, train_mask), batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(DatasetSplit(train_ds, val_mask), batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(DatasetSplit(train_ds, test_mask), batch_size=args.batch_size, shuffle=False)
-
-    return train_loader, val_loader, test_loader
-
-
-def inference_ds(peer, args):
-    # global_test = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    test = None
-    if args.test_scope == 'global':
-        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, num_workers=0)
-    elif args.test_scope == 'neighborhood':
-        collate = partial(collate_fn, scope=peer.neighborhood_data_scope())
-        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, collate_fn=collate)
-    elif args.test_scope == 'local':
-        collate = partial(collate_fn, scope=peer.local_data_scope())
-        test = DataLoader(peer.inference, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, collate_fn=collate)
-    else:
-        exit('Error: unrecognized TEST_SCOPE value')
-
-    return test
-
-
-def collate_fn(batch, scope):
-    modified_batch = []
-    for item in batch:
-        image, label = item
-        if label in scope:
-            modified_batch.append(item)
-    return default_collate(modified_batch)
+    return neighbors_ids, similarity
 
 
 def optimizer_func(optim):
@@ -360,23 +308,6 @@ def verify_metrics(_metric, _measure):
     else:
         measure = _measure
     return metric, measure
-
-
-def inference_eval(peer, one_batch=False):
-    t = time.time()
-    r = peer.model.evaluate(peer.inference, peer.device, one_batch)
-    o = "I" if one_batch else "*"
-    acc = round(r['val_acc'] * 100, 2)
-    loss = round(r['val_loss'], 2)
-    t = round(time.time() - t, 1)
-    log('result', f"Node {peer.id} [{t}s]{o} Inference acc: {acc}%,  loss: {loss}")
-
-
-def estimate_shards(data_size, num_users):
-    shards = num_users * 2 if num_users > 10 else 20
-    imgs = int(data_size / shards)
-
-    return shards, imgs
 
 
 def fill_history(a):
@@ -411,9 +342,9 @@ def wait_until(predicate, timeout=2, period=0.2, *args_, **kwargs):
 def create_tcp_socket():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    # sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, TCP_SOCKET_BUFFER_SIZE)
-    # sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, TCP_SOCKET_BUFFER_SIZE)
-    # sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, TCP_SOCKET_BUFFER_SIZE)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, TCP_SOCKET_BUFFER_SIZE)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     return sock
 
 
@@ -424,6 +355,17 @@ def get_node_conn_by_id(node, node_id):
     return None
 
 
+def labels_set(dataset):
+    try:
+        labels = set(dataset.train_labels_set)
+    except AttributeError:
+        classes = []
+        for b in dataset:
+            classes.extend(b[1].numpy())
+        labels = set(classes)
+
+    return labels
+
 # def angular_metric(u, v):
 #     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 #     sim = cos(u, v)
@@ -432,5 +374,3 @@ def get_node_conn_by_id(node, node_id):
 #     distance = 1 - similarity
 #
 #     return angle, similarity, distance
-
-

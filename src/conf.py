@@ -1,10 +1,17 @@
+import socket
+
+# LOCAL_PI = socket.gethostbyname(socket.gethostname())
+LOCAL_PI = socket.gethostbyname('localhost')
 HOST = "0.0.0.0"
 PORT = 9000
+LAUNCHER_HOST = "0.0.0.0"
+LAUNCHER_PORT = 15015
 TCP_SOCKET_BUFFER_SIZE = 500000
 TCP_SOCKET_SERVER_LISTEN = 10
 SOCK_TIMEOUT = 20
+LAUNCHER_TIMEOUT = 60
 
-ML_ENGINE = "NumPy"  # "NumPy"
+ML_ENGINE = "NumPy"  # "NumPy" or "PyTorch"
 DEFAULT_VAL_DS = "val"
 DEFAULT_MEASURE = "mean"
 EVAL_ROUND = 10
@@ -13,6 +20,7 @@ RECORD_RATE = 10
 M_CONSTANT = 1
 WAIT_TIMEOUT = 1.5
 WAIT_INTERVAL = 0.02
+FUNC_TIMEOUT = 60
 # TODO check TEST_SCOPE
 TEST_SCOPE = 'neighborhood'
 IDLE_POWER = 12.70

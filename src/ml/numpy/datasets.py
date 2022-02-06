@@ -1,76 +1,227 @@
-from time import sleep
+import copy
+import os
+import struct
+import time
+from random import shuffle
+from typing import Tuple, Any
 
 import numpy as np
-from torch.utils.data import ConcatDataset
 from numpy.random import multinomial
-from torchvision import datasets, transforms
 
-from src.measure_energy import measure_energy
-from src.profiler import profiler
-from src.utils import estimate_shards
+from src.conf import TRAIN_VAL_TEST_RATIO
+from src.utils import log
+
+MNIST_PATH = r'./data/mnist/MNIST/raw'
+CIFAR_PATH = r'./data/cifar/CIFAR/raw'
 
 
-# @profiler(timer="cpu")
-# @profiler
-# @measure_energy
 def get_dataset(args):
     """ Returns train and test datasets and a user group which is a dict where
     the keys are the user index and the values are the corresponding data for
     each of those users.
     """
+    log('info', f"Loading {args.dataset.upper()} dataset ...")
+    t = time.time()
     if args.dataset == 'mnist':
-        data_dir = './data/mnist/'
-        apply_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))  # mean/std over 1 channel
-        ])
-        train_dataset = datasets.MNIST(data_dir, train=True, download=True, transform=apply_transform)
-        test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=apply_transform)
-
-        # sample training data amongst users
+        train_dataset = MNIST(MNIST_PATH, train=True, shuffle=True)
+        test_dataset = MNIST(MNIST_PATH, train=False, shuffle=False)
         if args.iid:
-            # Sample IID user data from Mnist
             if args.unequal:
-                # Chose unequal splits for every user
                 user_groups = mnist_iid_unequal(train_dataset, args.num_users)
             else:
-                # Chose equal splits for every user
                 user_groups = mnist_iid(train_dataset, args.num_users)
         else:
-            # Sample Non-IID user data from Mnist
             if args.unequal:
-                # Chose unequal splits for every user
                 user_groups = mnist_noniid_unequal(train_dataset, args.num_users)
             else:
-                # Chose equal splits for every user
                 user_groups = mnist_noniid(train_dataset, args.num_users)
 
     elif args.dataset == 'cifar':
-        data_dir = './data/cifar/'
-        apply_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # mean/std over 3 channels
-        ])
-        train_dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=apply_transform)
-        test_dataset = datasets.CIFAR10(data_dir, train=False, download=True, transform=apply_transform)
-
-        # sample training data amongst users
-        if args.iid:
-            # Sample IID user data from Mnist
-            user_groups = cifar_iid(train_dataset, args.num_users)
-        else:
-            # Sample Non-IID user data from Mnist
-            if args.unequal:
-                # Chose unequal splits for every user
-                raise NotImplementedError()
-            else:
-                # Chose equal splits for every user
-                user_groups = cifar_noniid(train_dataset, args.num_users)
+        raise NotImplementedError()
 
     return train_dataset, test_dataset, user_groups
 
 
 # -- Sampling : MNIST ---------------------------------------------------------
+
+class MNIST(object):
+    def __init__(self, data_dir, train=None, shuffle=True, dimension=3):
+        self.train = train
+        self.train_x_set = None
+        self.train_y_set = None
+        self.train_labels_set = None
+
+        self.test_x_set = None
+        self.test_y_set = None
+        self.test_labels_set = None
+
+        self._shuffle = shuffle
+        self.__dim = dimension
+        if train is None or train is True:
+            self.__load_mnist_train(data_dir)
+        if train is None or train is False:
+            self.__load_mnist_test(data_dir)
+
+        self.__one_hot()
+        self.__dimension()
+        if self._shuffle:
+            self.shuffle()
+        self.__normalization()
+
+    def __load_mnist_train(self, path, kind='train'):
+        labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
+        images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
+        with open(labels_path, 'rb') as lbpath:
+            magic, n = struct.unpack('>II', lbpath.read(8))
+            labels = np.fromfile(lbpath, dtype=np.uint8)
+        with open(images_path, 'rb') as imgpath:
+            magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
+            images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+        self.train_x_set = images
+        self.train_labels_set = labels
+
+    def __load_mnist_test(self, path, kind='t10k'):
+        labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
+        images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
+        with open(labels_path, 'rb') as lbpath:
+            magic, n = struct.unpack('>II', lbpath.read(8))
+            labels = np.fromfile(lbpath, dtype=np.uint8)
+        with open(images_path, 'rb') as imgpath:
+            magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
+            images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+        self.test_x_set = images
+        self.test_labels_set = labels
+
+    def __one_hot(self):
+        if self.train in [None, True]:
+            trn = np.zeros([len(self.train_labels_set), 10])
+            for i, x in enumerate(self.train_labels_set):
+                trn[i, x] = 1
+            self.train_y_set = trn
+        if self.train in [None, False]:
+            te = np.zeros([len(self.test_labels_set), 10])
+            for i, x in enumerate(self.test_labels_set):
+                te[i, x] = 1
+            self.test_y_set = te
+
+    def __normalization(self, renormalize=False):
+        mean = 0.1306604762738434
+        std = 0.30810780385646314
+        if self.train in [None, True]:
+            self.train_x_set = self.train_x_set / 255.
+            if self.__dim == 3 and renormalize is False:
+                self.train_x_set -= mean
+                self.train_x_set /= std
+
+        if self.train in [None, False]:
+            self.test_x_set = self.test_x_set / 255.
+            if self.__dim == 3 and renormalize is False:
+                self.test_x_set -= mean
+                self.test_x_set /= std
+
+        if self.__dim == 3 and renormalize is True:
+            mean = 0
+            std = 0
+            for x in self.train_x_set:
+                mean += np.mean(x[:, :, 0])
+            mean /= len(self.train_x_set)
+            self.train_x_set -= mean
+            for x in self.train_x_set:
+                std += np.mean(np.square(x[:, :, 0]).flatten())
+            std = np.sqrt(std / len(self.train_x_set))
+            print('The mean and std of MNIST:', mean, std)  # 0.1306604762738434 0.30810780385646314
+            self.train_x_set /= std
+            self.test_x_set -= mean
+            self.test_x_set /= std
+
+    def __dimension(self):
+        if self.__dim == 1:
+            pass
+        elif self.__dim == 3:
+            if self.train in [None, True]:
+                self.train_x_set = np.reshape(self.train_x_set, [len(self.train_x_set), 28, 28, 1])
+            if self.train in [None, False]:
+                self.test_x_set = np.reshape(self.test_x_set, [len(self.test_x_set), 28, 28, 1])
+        else:
+            print('Dimension Error!')
+            exit(1)
+
+    def shuffle(self):
+        if self.train in [None, True]:
+            index = np.arange(len(self.train_x_set))
+            np.random.shuffle(index)
+            self.train_x_set = self.train_x_set[index]
+            self.train_y_set = self.train_y_set[index]
+            self.train_labels_set = self.train_labels_set[index]
+
+        if self.train in [None, False]:
+            index = np.arange(len(self.test_x_set))
+            np.random.shuffle(index)
+            self.test_x_set = self.test_x_set[index]
+            self.test_y_set = self.test_y_set[index]
+            self.test_labels_set = self.test_labels_set[index]
+
+    @property
+    def dataset(self):
+        if self.train is None:
+            return [self.train_x_set, self.test_x_set]
+        elif self.train is True:
+            return self.train_x_set
+        elif self.train is False:
+            return self.test_x_set
+
+    @property
+    def targets(self):
+        if self.train is None:
+            return [self.train_y_set, self.test_y_set]
+        elif self.train is True:
+            return self.train_y_set
+        elif self.train is False:
+            return self.test_y_set
+
+    def __len__(self):
+        if self.train is None:
+            return len(self.train_x_set) + len(self.test_x_set)
+        elif self.train is True:
+            return len(self.train_x_set)
+        elif self.train is False:
+            return len(self.test_x_set)
+
+    def __getitem__(self, index):
+        if self.train is True:
+            return self.train_x_set[index], self.train_y_set[index]
+        elif self.train is False:
+            return self.test_x_set[index], self.test_y_set[index]
+        else:
+            log('error', "Iterating MNIST dataset with Train=None is not supported")
+            exit()
+
+    def random_batches(self, batch_size, train=True, nb_batches=1):
+        batches = []
+        for i in range(nb_batches):
+            ids = np.random.choice(range(len(self.train_x_set)), batch_size, replace=False)
+            if self.train in [None, True] and train is True:
+                batches.append((self.train_x_set[ids], self.train_y_set[ids]))
+            elif self.train in [None, False] and train is False:
+                batches.append((self.test_x_set[ids], self.test_y_set[ids]))
+            else:
+                raise "random_batches cannot return batches for train and test"
+        return batches
+
+    def slice(self, index):
+        new_self = copy.deepcopy(self)
+        if self.train in [None, True]:
+            new_self.train_x_set = self.train_x_set[index]
+            new_self.train_y_set = self.train_y_set[index]
+        if self.train in [None, False]:
+            new_self.test_x_set = self.test_x_set[index]
+            new_self.test_y_set = self.test_y_set[index]
+
+        return new_self
+
+    def __str__(self):
+        return f"MNIST/Train={self.train} with {len(self)} samples"
+
 
 def mnist_iid(dataset, num_users):
     """
@@ -120,7 +271,7 @@ def mnist_noniid(dataset, num_users):
     dict_users = {i: np.array([]) for i in range(num_users)}
     idxs = np.arange(num_shards * num_imgs)
     # labels = dataset.train_labels.numpy()
-    labels = np.array(dataset.targets)
+    labels = dataset.targets
 
     # sort labels
     idxs_labels = np.vstack((idxs, labels))
@@ -152,7 +303,7 @@ def mnist_noniid_unequal(dataset, num_users):
     dict_users = {i: np.array([]) for i in range(num_users)}
     idxs = np.arange(num_shards * num_imgs)
     # labels = dataset.train_labels.numpy()
-    labels = np.array(dataset.targets)
+    labels = dataset.targets
     # sort labels
     idxs_labels = np.vstack((idxs, labels))
     idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
@@ -366,19 +517,61 @@ def cifar_noniid(dataset, num_users):
     return dict_users
 
 
+# -- Utility functions : ------------------------------------------------------
+
+def estimate_shards(data_size, num_users):
+    shards = num_users * 2 if num_users > 10 else 20
+    imgs = int(data_size / shards)
+
+    return shards, imgs
+
+
+def train_val_test(train_ds, mask, args, ratio=None):
+    """
+    Returns train, validation and test dataloaders for a given dataset
+    and user indexes.
+    """
+    ratio = TRAIN_VAL_TEST_RATIO if ratio is None else ratio
+    mask = list(mask)
+    shuffle(mask)
+    assert np.sum(ratio) == 1, "Ratio between train, dev and test must sum to 1."
+    v1 = int(ratio[0] * len(mask))
+    v2 = int((ratio[0] + ratio[1]) * len(mask))
+    # split indexes for train, validation, and test (80, 10, 10)
+    train_mask = mask[:v1]
+    val_mask = mask[v1:v2]
+    test_mask = mask[v2:]
+
+    # create data holders
+    train_holder = train_ds.slice(train_mask)
+    val_holder = train_ds.slice(val_mask)
+    test_holder = train_ds.slice(test_mask)
+
+    return train_holder, val_holder, test_holder
+
+
+def inference_ds(peer, args):
+    # todo handle inference scope
+    if args.test_scope in ['global', 'neighborhood', 'local']:
+        return peer.inference
+    else:
+        exit(f'Error: unrecognized TEST_SCOPE value: {args.test_scope}')
+
+
 # -- MAIN TEST ----------------------------------------------------------------
 
 if __name__ == '__main__':
-    from addict import Dict
-
-    arguments = Dict({
-        'dataset': 'mnist',
-        'num_users': 10,
-        'iid': True,
-        'unequal': True,
-    })
-    a, b, c = get_dataset(arguments)
-    print(len(c[0]))
+    pass
+    # from addict import Dict
+    #
+    # arguments = Dict({
+    #     'dataset': 'mnist',
+    #     'num_users': 10,
+    #     'iid': True,
+    #     'unequal': True,
+    # })
+    # a, b, c = get_dataset(arguments)
+    # print(len(c[0]))
 
     # trans = transforms.Compose([
     #     transforms.ToTensor(),
