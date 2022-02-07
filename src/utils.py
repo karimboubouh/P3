@@ -355,14 +355,16 @@ def get_node_conn_by_id(node, node_id):
     return None
 
 
-def get_my_ip_address(remote_server="google.com"):
-    """
-    Return the/a network-facing IP number for this system.
-    """
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.settimeout(0.1)
-        s.connect((remote_server, 80))
+def get_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
         return s.getsockname()[0]
+    except OSError:
+        return socket.gethostbyname(socket.gethostname())
+    finally:
+        s.close()
+
 
 def labels_set(dataset):
     try:

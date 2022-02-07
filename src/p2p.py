@@ -17,7 +17,7 @@ from src.conf import PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ML_ENGINE
 from src.helpers import Map
 from src.ml import get_dataset, train_val_test, inference_ds, evaluate_model, get_params, set_params, train_for_x_epoch
 from src.ml import initialize_models, model_fit, model_inference
-from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_my_ip_address
+from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_ip_address
 
 
 class Node(Thread):
@@ -26,7 +26,7 @@ class Node(Thread):
         super(Node, self).__init__()
         self.id = k
         self.mp = bool(args.mp)
-        self.host = get_my_ip_address()
+        self.host = get_ip_address()
         self.port = PORT + k
         self.device = args.device
         self.model = model
@@ -486,14 +486,6 @@ class Graph:
 
     def get_peers(self):
         return self.peers
-
-    def local_score(self, metric='accuracy', measure='mean'):
-        if scope == 'local' and metric == 'accuracy':
-            accuracy_epochs()
-
-    def plot_local_score(self, metric='accuracy', measure='mean'):
-        if scope == 'local' and metric == 'accuracy':
-            accuracy_epochs()
 
     def show_similarity(self, ids=False, matrix=False):
         log('info', "Similarity Matrix")
