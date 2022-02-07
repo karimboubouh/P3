@@ -1,10 +1,10 @@
 from kivy.core.window import Window
 from kivy.lang.builder import Builder
 from kivymd.app import MDApp
+from src.screens import *
 
 # Window.size = (336, 600)
 Window.release_all_keyboards()
-
 
 
 class HgOApp(MDApp):

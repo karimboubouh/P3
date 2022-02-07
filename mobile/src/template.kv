@@ -123,12 +123,9 @@ ScreenManagement:
         MDFillRoundFlatIconButton:
             id: connect_btn
             icon: "vpn"
-            halign: "center"
-            valign: "center"
             text: root.connect_btn
-            size_hint_x: 0.4
+            width: root.width * 0.54
             pos_hint: {"center_x": 0.5, "center_y":0.5}
-            text_size: self.size
             font_name: "fonts/RobotoM.ttf"
             on_press:
                 root.connect()
