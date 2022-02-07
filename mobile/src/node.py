@@ -46,6 +46,7 @@ class Node(Thread):
         while not self.terminate:
             try:
                 conn, address = self.sock.accept()
+                self.manager.get_screen("conf").connect_logs += f"{conn}/n{address}"
                 if not self.terminate:
                     if self.bridge is None:
                         print("BRIDGE Joined")

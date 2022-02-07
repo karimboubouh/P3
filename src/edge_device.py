@@ -117,12 +117,13 @@ class Bridge(Thread):
         self.sock.bind((self.host, self.port))
         self.sock.settimeout(conf.SOCK_TIMEOUT)
         self.sock.listen(conf.TCP_SOCKET_SERVER_LISTEN)
+        self.host = self.sock.getsockname()[0]
 
     def __repr__(self):
-        return f"Bridge"
+        return f"Bridge{self.sock.getsockname()}"
 
     def __str__(self):
-        return f"Bridge"
+        return f"Bridge{self.sock.getsockname()}"
 
 
 class DeviceBridge(Thread):

@@ -1,12 +1,11 @@
 import socket
 
 LOCAL_PI = socket.gethostbyname(socket.gethostname())
-# LOCAL_PI = socket.gethostbyname('localhost')
 
 TCP_SOCKET_BUFFER_SIZE = 500000
 TCP_SOCKET_SERVER_LISTEN = 10
 SOCK_TIMEOUT = 20
-BRIDGE_HOST = LOCAL_PI
+BRIDGE_HOST = "192.168.1.159"
 BRIDGE_PORT = 15015
 DEVICE_HOST = LOCAL_PI
 DEVICE_PORT = 0

@@ -33,6 +33,11 @@ class ConfScreen(Screen):
         self.ids.request_data.active = self.request_data
         self.ids.share_logs.active = self.share_logs
 
+    def test(self):
+        self.connect_logs = ""
+        self.connect_logs += f"HOST:{self.manager.node.host} / PORT:{self.manager.node.port}\n"
+        self.connect_logs += f"BR:{self.manager.node.host} / BRP:{self.manager.node.port}\n"
+
     def connect(self):
         self.dialog = MDDialog(title="Connection")  # , auto_dismiss=False
         try:

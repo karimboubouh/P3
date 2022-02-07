@@ -225,6 +225,7 @@ class Node(Thread):
         self.sock.bind((self.host, self.port))
         self.sock.settimeout(SOCK_TIMEOUT)
         self.sock.listen(TCP_SOCKET_SERVER_LISTEN)
+        self.port = self.sock.getsockname()[1]
 
     # Special methods
     def __repr__(self):
