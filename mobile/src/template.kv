@@ -123,13 +123,14 @@ ScreenManagement:
             id: connect_btn
             icon: "vpn"
             halign: "center"
+            valign: "middle"
             text: root.connect_btn
-            width: root.width*0.5
+            size_hint_x: 0.4
             pos_hint: {"center_x": 0.5, "center_y":0.5}
-            font_size: '14sp'
+            text_size: self.size
             font_name: "fonts/RobotoM.ttf"
             on_press:
-                root.test()
+                root.connect()
         MDLabel:
             id: connect_logs
             text: root.connect_logs
@@ -144,7 +145,7 @@ ScreenManagement:
             id: join_btn
             text: 'Join P2P Training'
             disabled: root.join_disabled
-            size_hint: 1, 1
+            size_hint: 1, .75
             halign: "center"
             theme_text_color: "Secondary"
             pos_hint: {'center_x':0.5,'center_y':0.6}

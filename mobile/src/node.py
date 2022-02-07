@@ -8,9 +8,9 @@ from threading import Thread
 from kivymd.toast import toast
 
 from src import protocol
-from src.conf import SOCK_TIMEOUT, DEVICE_HOST, DEVICE_PORT, TCP_SOCKET_SERVER_LISTEN, ALGORITHM_MODULE
+from src.conf import SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ALGORITHM_MODULE
 from src.ml import model_fit, model_inference, train_for_x_epoch, evaluate_model, get_params, set_params
-from src.utils import Map, create_tcp_socket, labels_set
+from src.utils import Map, create_tcp_socket, labels_set, get_my_ip_address
 
 
 class Node(Thread):
@@ -19,8 +19,8 @@ class Node(Thread):
         super(Node, self).__init__()
         self.id = None
         self.manager = manager
-        self.host = DEVICE_HOST
-        self.port = DEVICE_PORT
+        self.host = get_my_ip_address()
+        self.port = 0
         self.bridge = None
         self.model = None
         self.local_model = None

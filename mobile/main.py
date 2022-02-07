@@ -1,12 +1,8 @@
-from kivy.core.window import Window
 from kivy.lang.builder import Builder
 from kivymd.app import MDApp
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.list import IRightBodyTouch
 
 from src.screens import *
-
-Window.size = (336, 600)
+# Window.size = (336, 600)
 
 
 class HgOApp(MDApp):
