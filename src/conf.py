@@ -1,10 +1,10 @@
 import socket
 
-# LOCAL_PI = socket.gethostbyname(socket.gethostname())
-LOCAL_PI = socket.gethostbyname('localhost')
-HOST = "0.0.0.0"
+LOCAL_PI = socket.gethostbyname(socket.gethostname())
+# LOCAL_PI = socket.gethostbyname('localhost')
+HOST = LOCAL_PI
 PORT = 9000
-LAUNCHER_HOST = "0.0.0.0"
+LAUNCHER_HOST = LOCAL_PI
 LAUNCHER_PORT = 15015
 TCP_SOCKET_BUFFER_SIZE = 500000
 TCP_SOCKET_SERVER_LISTEN = 10
