@@ -28,8 +28,10 @@ class ConfScreen(Screen):
     def init(self, *args):
         self.ids.bridge_host.text = self.bridge_host
         self.ids.bridge_host.focus = True
+        self.ids.bridge_host.focus = False
         self.ids.bridge_port.text = str(self.bridge_port)
         self.ids.bridge_port.focus = True
+        self.ids.bridge_port.focus = False
         self.ids.request_data.active = self.request_data
         self.ids.share_logs.active = self.share_logs
 
