@@ -15,12 +15,12 @@ if __name__ == '__main__':
     args = load_conf()
     # =================================
     args.mp = 1
-    args.num_users = 50
+    args.num_users = 10
     args.epochs = 1
-    args.batch_size = 64  # 128
+    args.batch_size = 128
     args.iid = 1
     args.unequal = 0
-    args.rounds = 500
+    args.rounds = 300
     # =================================
     fixed_seed(True)
 
@@ -36,9 +36,9 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=False)
     # set up the network topology
-    topology = random_graph(models, sigma=0.84)
+    topology = random_graph(models, sigma=0.4)
     # include physical edge devices
-    edge = edge_devices(args, count=2)
+    edge = edge_devices(args, count=1)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args, edge=edge)
     graph.show_neighbors()

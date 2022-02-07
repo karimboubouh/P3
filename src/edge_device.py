@@ -87,8 +87,8 @@ class Bridge(Thread):
         info = {'id': i, 'args': args, 'model': model, 'ids': ids, 'clustered': clustered, 'similarity': sim}
         if bridge.request_data:
             # todo remove
-            data['train'] = data['val']
-            data['inference'] = data['val']
+            # data['train'] = data['val']
+            # data['inference'] = data['val']
             info['dataset'] = data
         bridge.populate(info)
 
