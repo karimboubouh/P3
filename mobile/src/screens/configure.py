@@ -36,7 +36,7 @@ class ConfScreen(Screen):
         self.ids.share_logs.active = self.share_logs
 
     def connect(self):
-        self.connect_logs = f"HOST:{self.manager.node.host} / PORT:{self.manager.node.port}\n"
+        # self.connect_logs = f"HOST:{self.manager.node.host} / PORT:{self.manager.node.port}\n"
         self.dialog = MDDialog(title="Connection")  # , auto_dismiss=False
         try:
             if self.manager.node.connect_bridge(self.bridge_host, self.bridge_port):

@@ -8,7 +8,7 @@ import numpy as np
 from src import protocol
 from src import conf
 from src.helpers import Map
-from src.utils import log, wait_until, create_tcp_socket
+from src.utils import log, wait_until, create_tcp_socket, get_my_ip_address
 
 
 def edge_devices(args, count=1, rand_ids=False):
@@ -46,7 +46,7 @@ class Bridge(Thread):
         self.ids = self.devices_ids.tolist()
         self.args = args
         self.terminate = False
-        self.host = conf.LAUNCHER_HOST
+        self.host = get_my_ip_address()
         self.port = conf.LAUNCHER_PORT
         self.bridges = []
         self.waiting = {}

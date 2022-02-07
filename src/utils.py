@@ -355,6 +355,14 @@ def get_node_conn_by_id(node, node_id):
     return None
 
 
+def get_my_ip_address(remote_server="google.com"):
+    """
+    Return the/a network-facing IP number for this system.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect((remote_server, 80))
+        return s.getsockname()[0]
+
 def labels_set(dataset):
     try:
         labels = set(dataset.train_labels_set)

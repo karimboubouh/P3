@@ -13,11 +13,11 @@ import numpy as np
 import torch
 
 from src import protocol
-from src.conf import HOST, PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ML_ENGINE
+from src.conf import PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ML_ENGINE
 from src.helpers import Map
 from src.ml import get_dataset, train_val_test, inference_ds, evaluate_model, get_params, set_params, train_for_x_epoch
 from src.ml import initialize_models, model_fit, model_inference
-from src.utils import optimizer_func, log, create_tcp_socket, labels_set
+from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_my_ip_address
 
 
 class Node(Thread):
@@ -26,7 +26,7 @@ class Node(Thread):
         super(Node, self).__init__()
         self.id = k
         self.mp = bool(args.mp)
-        self.host = HOST
+        self.host = get_my_ip_address()
         self.port = PORT + k
         self.device = args.device
         self.model = model
