@@ -132,6 +132,7 @@ def get_node_conn_by_id(node, node_id):
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(1)
     try:
         s.connect(("8.8.8.8", 80))
         return s.getsockname()[0]

@@ -36,10 +36,12 @@ class ConfScreen(Screen):
         self.ids.share_logs.active = self.share_logs
 
     def connect(self):
-        # self.connect_logs = f"HOST:{self.manager.node.host} / PORT:{self.manager.node.port}\n"
+        host = self.ids.bridge_host.text
+        port = int(self.ids.bridge_port.text)
+        self.connect_logs = f"HOST:{self.manager.node.host} / PORT:{self.manager.node.port}\n"
         self.dialog = MDDialog(title="Connection")  # , auto_dismiss=False
         try:
-            if self.manager.node.connect_bridge(self.bridge_host, self.bridge_port):
+            if self.manager.node.connect_bridge(host, port):
                 self.ids.connect_btn.disabled = True
                 self.connect_btn = "Connected"
                 toast("Connected successfully")
