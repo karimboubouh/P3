@@ -12,11 +12,11 @@ shield_cpu
 configure_cpu_performance
 
 # run powerstat in idle state for 10min
-idle_powerstat
+#idle_powerstat
 
 # run a given program for $runs times
 multi_run
 
 # reset configurations
 
-#reset_configurations
+reset_configurations

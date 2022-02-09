@@ -75,13 +75,16 @@ def train_init(peer):
 
 
 def train_step(peer, t):  # , PSS
+    """
+        ||w_i - w_j||_2 < sigma_2
+    """
     T = t if isinstance(t, tqdm) or isinstance(t, range) else [t]
     for t in T:
         # train for E (one) epoch
-        peer.train_one_epoch()
+        peer.train_one_epoch()  # weights ==> multiple epochs
         # broadcast current model to all my active neighbors
         active = active_peers(peer.neighbors, peer.params.frac)
-        msg = protocol.train_step(t, peer.get_model_params())
+        msg = protocol.train_step(t, peer.get_model_params())  # grads
         peer.broadcast(msg, active)
         # wait for enough updates labeled with round number t
         wait_until(enough_received, WAIT_TIMEOUT, WAIT_INTERVAL, peer, t, len(active))
@@ -91,6 +94,7 @@ def train_step(peer, t):  # , PSS
         else:
             log('log', f"{peer} got {len(peer.V[t])}/{len(active)} messages in round {t}.")
         # collaborativeUpdate
+        # w_t = collaborativeUpdate(peer, t)
         w_t = collaborativeUpdateLight(peer, t)
         # update and evaluate the model
         if isinstance(T, tqdm):

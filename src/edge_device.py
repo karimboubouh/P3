@@ -12,6 +12,8 @@ from src.utils import log, wait_until, create_tcp_socket, get_ip_address
 
 
 def edge_devices(args, count=1, rand_ids=False):
+    if count < 1:
+        return None
     if conf.ML_ENGINE != "NumPy":
         log('error', f"Mobile devices currently only support NumPy based ML")
         exit()

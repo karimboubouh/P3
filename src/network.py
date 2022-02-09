@@ -84,7 +84,7 @@ def datasim_network(data, sigma=0.2):
     return adjacency, similarities
 
 
-def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge: Bridge):
+def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge=None):
     nbr_nodes = len(user_groups)
     clustered = True if len(topology['clusters']) > 1 else False
     peers = list()
@@ -93,7 +93,7 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge: 
         neighbors_ids, similarity = node_topology(i, topology)
         train, val, test = train_val_test(train_ds, user_groups[i], args)
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
-        if edge.is_edge_device(i):
+        if edge and edge.is_edge_device(i):
             device_bridge = edge.populate_device(i, models[i], data, neighbors_ids, clustered, similarity)
             device_bridge.neighbors_ids = neighbors_ids
             peers.append(device_bridge)
@@ -107,7 +107,7 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge: 
 
     # Transformations
     # todo handle inference for BridgeDevices
-    # graph.set_inference(args)
+    graph.set_inference(args)
 
     return graph
 

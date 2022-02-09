@@ -258,7 +258,7 @@ run_program() {
 reset_configurations() {
   cecho YELLOW "Restoring default configurations"
   #  sudo chmod -r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
-  deactivate
+  #  deactivate
   sudo cset shield --reset
   sudo cpupower --cpu all frequency-set -g ondemand -d $MIN_FREQ -u $MAX_FREQ
   cecho GREEN "Program terminated."

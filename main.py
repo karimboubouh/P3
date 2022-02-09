@@ -16,11 +16,11 @@ if __name__ == '__main__':
     # =================================
     args.mp = 1
     args.num_users = 10
-    args.epochs = 1
-    args.batch_size = 128
+    args.epochs = 2
+    args.batch_size = 16  # 128
     args.iid = 1
     args.unequal = 0
-    args.rounds = 300
+    args.rounds = 200
     # =================================
     fixed_seed(True)
 
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     # load dataset and initialize user groups
     train_ds, test_ds, user_groups = get_dataset(args)
     # build users models
-    models = initialize_models(args, same=False)
+    models = initialize_models(args, same=True)
     # set up the network topology
     topology = random_graph(models, sigma=0.4)
     # include physical edge devices
@@ -51,5 +51,4 @@ if __name__ == '__main__':
     collab_logs = graph.collaborative_training(learner=p3, args=args)
     info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
     plot_train_history(collab_logs, metric='accuracy', measure="mean")
-    print("END.")
-    # os._exit(1)
+    # print("END.")

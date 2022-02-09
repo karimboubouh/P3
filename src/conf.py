@@ -1,8 +1,3 @@
-import socket
-
-# LOCAL_PI = socket.gethostbyname(socket.gethostname())
-# LOCAL_PI = socket.gethostbyname('localhost')
-# LOCAL_PI = ''
 PORT = 9000
 LAUNCHER_PORT = 15015
 TCP_SOCKET_BUFFER_SIZE = 500000
@@ -22,6 +17,6 @@ WAIT_INTERVAL = 0.02
 FUNC_TIMEOUT = 60
 # TODO check TEST_SCOPE
 TEST_SCOPE = 'neighborhood'
-IDLE_POWER = 12.70
+IDLE_POWER = 12.60
 INFERENCE_BATCH_SIZE = 512
 DATASET_DUPLICATE = 0

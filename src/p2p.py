@@ -15,8 +15,10 @@ import torch
 from src import protocol
 from src.conf import PORT, SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ML_ENGINE
 from src.helpers import Map
+from src.measure_energy import measure_energy
 from src.ml import get_dataset, train_val_test, inference_ds, evaluate_model, get_params, set_params, train_for_x_epoch
 from src.ml import initialize_models, model_fit, model_inference
+from src.profiler import profiler
 from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_ip_address
 
 
@@ -391,6 +393,8 @@ class Graph:
         self.args = args
 
     @staticmethod
+    # @measure_energy
+    # @profiler
     def centralized_training(args, inference=True):
         t = time.time()
         log('warning', f'ML engine: {ML_ENGINE}')
@@ -400,7 +404,6 @@ class Graph:
         args.unequal = 0
         args.iid = 1
         args.rounds = 0
-        log('info', f"Loading {args.dataset} dataset")
         train_ds, test_ds, user_groups = get_dataset(args)
         train, val, test = train_val_test(train_ds, user_groups[0], args)
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
