@@ -37,7 +37,7 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=True)
     # set up the network topology
-    topology = random_graph(models, sigma=None)
+    topology = random_graph(models, sigma=0.4)
     # include physical edge devices
     edge = edge_devices(args, count=1)
     # build the network graph

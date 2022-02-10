@@ -316,7 +316,7 @@ class Bridge(Thread):
                     to_read = length - len(buffer)
                     buffer += self.sock.recv(409600000 if to_read > 409600000 else to_read)
                     if len(buffer) > 409600:
-                        toast(f"Buffer={len(buffer)}", duration=1)
+                        toast(f"Buffer={len(buffer)}")
                 if buffer:
                     data = pickle.loads(buffer)
                     if data and data['mtype'] == protocol.CALL_METHOD:
@@ -328,8 +328,9 @@ class Bridge(Thread):
                         print(f"Unknown type of message from bridge: {data['mtype']}")
             except pickle.UnpicklingError as e:
                 print(f"Corrupted message from bridge : {e}")
-            except socket.timeout:
-                pass
+            except socket.timeout as e:
+                traceback.print_exc()
+                print(f"ERROR: TIMIII {e}")
             except struct.error as e:
                 pass
             except Exception as e:
