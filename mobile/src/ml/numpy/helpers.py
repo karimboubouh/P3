@@ -58,7 +58,9 @@ def initialize_models(args, same=False):
 def model_fit(peer):
     peer.model.train(peer.train.dataset, peer.train.targets)
     peer.model.val(peer.val.dataset, peer.val.targets)
-    peer.model.test(peer.test.dataset, peer.test.targets)
+    # peer.model.test(peer.test.dataset, peer.test.targets)
+    # todo REMOVE
+    peer.model.test(peer.val.dataset, peer.val.targets)
     history = peer.model.fit(
         lr=peer.params.lr,
         momentum=peer.params.momentum,

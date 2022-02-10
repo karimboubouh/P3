@@ -107,7 +107,7 @@ def args_parser():
     parser.add_argument('--stopping_rounds', type=int, default=10,
                         help='rounds of early stopping')
     parser.add_argument('--verbose', type=int, default=2, help='verbose')
-    parser.add_argument('--seed', type=int, default=1, help='random seed')
+    parser.add_argument('--seed', type=int, default=2, help='random seed')
     global args
     args = parser.parse_args()
     return args
@@ -357,7 +357,7 @@ def get_node_conn_by_id(node, node_id):
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(1)
+    s.settimeout(10)
     try:
         s.connect(("8.8.8.8", 80))
         return s.getsockname()[0]

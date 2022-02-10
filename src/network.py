@@ -89,9 +89,12 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge=N
     clustered = True if len(topology['clusters']) > 1 else False
     peers = list()
     t = time.time()
+    # todo remove
+    train, val, test = train_val_test(train_ds, user_groups[0], args)
+    print(f"REMOVE: {time.time() - t} seconds")
     for i in range(nbr_nodes):
         neighbors_ids, similarity = node_topology(i, topology)
-        train, val, test = train_val_test(train_ds, user_groups[i], args)
+        # train, val, test = train_val_test(train_ds, user_groups[i], args)
         data = {'train': train, 'val': val, 'test': test, 'inference': test_ds}
         if edge and edge.is_edge_device(i):
             device_bridge = edge.populate_device(i, models[i], data, neighbors_ids, clustered, similarity)
@@ -100,6 +103,7 @@ def network_graph(topology, models, train_ds, test_ds, user_groups, args, edge=N
         else:
             peer = Node(i, models[i], data, neighbors_ids, clustered, similarity, args)
             peer.start()
+            log('info', f"Node {i} started")
             peers.append(peer)
     connect_to_neighbors(peers)
     graph = Graph(peers, topology, test_ds, args)

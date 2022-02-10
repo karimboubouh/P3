@@ -8,8 +8,8 @@ MAX_FREQ="3.6Ghz"
 AVG_FREQ="1.9Ghz"
 MIN_FREQ="1.2Ghz"
 IDLE_TIME=60
-AVG_IDLE_POWER=12.55
-STD_IDLE_POWER=0.30
+AVG_IDLE_POWER=12.65
+STD_IDLE_POWER=0.25
 
 cecho() {
   BOLD="\033[1m"
@@ -258,7 +258,7 @@ run_program() {
 reset_configurations() {
   cecho YELLOW "Restoring default configurations"
   #  sudo chmod -r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
-  #  deactivate
+  deactivate
   sudo cset shield --reset
   sudo cpupower --cpu all frequency-set -g ondemand -d $MIN_FREQ -u $MAX_FREQ
   cecho GREEN "Program terminated."

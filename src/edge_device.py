@@ -89,8 +89,9 @@ class Bridge(Thread):
         info = {'id': i, 'args': args, 'model': model, 'ids': ids, 'clustered': clustered, 'similarity': sim}
         if bridge.request_data:
             # todo remove
-            # data['train'] = data['val']
-            # data['inference'] = data['val']
+            data['inference'] = data['test']
+            data['test'] = np.array([])
+            print([len(x) for x in data.values()])
             info['dataset'] = data
         bridge.populate(info)
 
@@ -143,6 +144,7 @@ class DeviceBridge(Thread):
         self.id = bid
         self.terminate = False
         self.callbacks = {}
+        self.inference = "TODO"
         self.current_exec = None
         self.params = Map({
             'logs': []
@@ -188,6 +190,8 @@ class DeviceBridge(Thread):
 
     def send(self, msg):
         try:
+            if len(msg) > 10000:
+                print(f"msg={len(msg)}")
             if self.terminate:
                 log('log', f"{self} tries to send on terminated")
             length = struct.pack('>Q', len(msg))

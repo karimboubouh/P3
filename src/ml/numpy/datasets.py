@@ -8,7 +8,7 @@ from typing import Tuple, Any
 import numpy as np
 from numpy.random import multinomial
 
-from src.conf import TRAIN_VAL_TEST_RATIO
+from src.conf import TRAIN_VAL_TEST_RATIO, DATASET_DUPLICATE
 from src.utils import log
 
 MNIST_PATH = r'./data/mnist/MNIST/raw'
@@ -77,6 +77,9 @@ class MNIST(object):
         with open(images_path, 'rb') as imgpath:
             magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
             images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+        if DATASET_DUPLICATE > 0:
+            labels = labels.repeat(DATASET_DUPLICATE, axis=0)
+            images = images.repeat(DATASET_DUPLICATE, axis=0)
         self.train_x_set = images
         self.train_labels_set = labels
 

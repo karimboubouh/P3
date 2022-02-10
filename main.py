@@ -15,12 +15,13 @@ if __name__ == '__main__':
     args = load_conf()
     # =================================
     args.mp = 1
+    # 10 (sigma=0.4) // 100 (sigma=0.8) // 300 (sigma=0.9)
     args.num_users = 10
     args.epochs = 2
-    args.batch_size = 16  # 128
+    args.batch_size = 128  # 16
     args.iid = 1
     args.unequal = 0
-    args.rounds = 200
+    args.rounds = 500
     # =================================
     fixed_seed(True)
 
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=True)
     # set up the network topology
-    topology = random_graph(models, sigma=0.4)
+    topology = random_graph(models, sigma=None)
     # include physical edge devices
     edge = edge_devices(args, count=1)
     # build the network graph
@@ -49,6 +50,6 @@ if __name__ == '__main__':
 
     # Phase II: Collaborative training
     collab_logs = graph.collaborative_training(learner=p3, args=args)
-    info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
-    plot_train_history(collab_logs, metric='accuracy', measure="mean")
-    # print("END.")
+    # info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
+    # plot_train_history(collab_logs, metric='accuracy', measure="mean")
+    print("END.")

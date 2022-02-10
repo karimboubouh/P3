@@ -1,6 +1,7 @@
 import pickle
 import socket
 import struct
+import traceback
 from copy import deepcopy
 from importlib import import_module
 from threading import Thread
@@ -313,7 +314,9 @@ class Bridge(Thread):
                 buffer = b''
                 while len(buffer) < length:
                     to_read = length - len(buffer)
-                    buffer += self.sock.recv(4096 * 100 if to_read > 4096 * 100 else to_read)
+                    buffer += self.sock.recv(409600000 if to_read > 409600000 else to_read)
+                    if len(buffer) > 409600:
+                        toast(f"Buffer={len(buffer)}", duration=1)
                 if buffer:
                     data = pickle.loads(buffer)
                     if data and data['mtype'] == protocol.CALL_METHOD:
@@ -331,6 +334,7 @@ class Bridge(Thread):
                 pass
             except Exception as e:
                 self.terminate = True
+                traceback.print_exc()
                 print(f"Bridge run Exception\n{e}")
         self.sock.close()
         print(f"Bridge disconnected")
@@ -363,7 +367,7 @@ class Bridge(Thread):
         elif "execute" in d['method']:
             self.method_execute(d)
 
-    def method_populate(self, info):
+    def method_populate(self, info: dict):
         self.device.id = info['id']
         self.device.model = info['model']
         self.device.clustered = info['clustered']

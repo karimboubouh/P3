@@ -141,7 +141,6 @@ class Node(Thread):
             self.current_exec.start()
         except Exception as e:
             log('error', f"{self} Execute exception: {e}")
-            traceback.print_exc()
             return None
 
     def fit(self, inference=True):
@@ -258,6 +257,7 @@ class NodeConnection(Thread):
                     buffer += self.sock.recv(4096 if to_read > 4096 else to_read)
                 if buffer:
                     data = pickle.loads(buffer)
+                    del buffer
                     if data and data['mtype'] == protocol.TRAIN_STEP:
                         self.handle_step(data['data'])
                     elif data and data['mtype'] == protocol.CONNECT:
