@@ -1,5 +1,6 @@
 import copy
 import os
+import pickle
 import struct
 import time
 from random import shuffle
@@ -36,19 +37,22 @@ class MNIST(object):
         self.__normalization()
 
     def __load_mnist_train(self, path, kind='train'):
-        labels_path = os.path.join(path, '%s_labels.npy' % kind)
-        images_path = os.path.join(path, '%s_images.npy' % kind)
-        # np.save(f"{kind}_labels", labels)
-        labels = np.load(labels_path)
-        images = np.load(images_path).reshape(len(labels), 784)
+        labels_path = os.path.join(path, '%s_labels.pkl' % kind)
+        images_path = os.path.join(path, '%s_images.pkl' % kind)
+        with open(labels_path, 'rb') as handle:
+            labels = pickle.load(handle)
+        with open(images_path, 'rb') as handle:
+            images = pickle.load(handle).reshape(len(labels), 784)
         self.train_x_set = images
         self.train_labels_set = labels
 
     def __load_mnist_test(self, path, kind='t10k'):
-        labels_path = os.path.join(path, '%s_labels.npy' % kind)
-        images_path = os.path.join(path, '%s_images.npy' % kind)
-        labels = np.load(labels_path)
-        images = np.load(images_path).reshape(len(labels), 784)
+        labels_path = os.path.join(path, '%s_labels.pkl' % kind)
+        images_path = os.path.join(path, '%s_images.pkl' % kind)
+        with open(labels_path, 'rb') as handle:
+            labels = pickle.load(handle)
+        with open(images_path, 'rb') as handle:
+            images = pickle.load(handle).reshape(len(labels), 784)
         self.test_x_set = images
         self.test_labels_set = labels
 
