@@ -43,6 +43,10 @@ class MNIST(object):
             labels = pickle.load(handle)
         with open(images_path, 'rb') as handle:
             images = pickle.load(handle).reshape(len(labels), 784)
+        print(f"OPEN: config.DATASET_DUPLICATE={config.DATASET_DUPLICATE}")
+        if config.DATASET_DUPLICATE > 1:
+            labels = labels.repeat(config.DATASET_DUPLICATE, axis=0)
+            images = images.repeat(config.DATASET_DUPLICATE, axis=0)
         self.train_x_set = images
         self.train_labels_set = labels
 
@@ -194,6 +198,7 @@ def get_local_data(path, num_users, ds_duplicate):
     print(f"DATASET_DUPLICATE={config.DATASET_DUPLICATE}")
     train_ds = MNIST(path, train=True, shuffle=True)
     test_ds = MNIST(path, train=False, shuffle=False)
+    print(f"train_y_set={len(train_ds.train_y_set)}")
 
     ratio = config.TRAIN_VAL_TEST_RATIO
     mask = list(range(required_samples))
@@ -202,6 +207,9 @@ def get_local_data(path, num_users, ds_duplicate):
     train_mask = mask[:v1]
     val_mask = mask[v1:v2]
     test_mask = mask[v2:]
+    print(f"train_mask={len(train_mask)}")
+    print(f"val_mask={len(val_mask)}")
+    print(f"test_mask={len(test_mask)}")
 
     train_holder = train_ds.slice(train_mask)
     val_holder = train_ds.slice(val_mask)
