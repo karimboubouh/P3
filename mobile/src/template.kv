@@ -119,14 +119,17 @@ ScreenManagement:
                 color_mode: 'accent'
                 pos_hint: {"center_x": 0.5, "center_y":.5}
         MDSeparator:
-        MDLabel:
+        MDFlatButton:
             id: ds_label
             text: root.ds_path
-            markup: True
             padding: 20, 20
             theme_text_color: "Custom"
             text_color: 1, 1, 0, 1
             size_hint_y: 0.5
+            width: root.width * 0.5
+            markup: True
+            pos_hint: {'center_x': .5, 'center_y': .6}
+            on_release: root.file_manager_open()
 
         MDFillRoundFlatIconButton:
             id: connect_btn

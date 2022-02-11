@@ -1,12 +1,15 @@
+import os
+
+from kivy import platform
 from kivy.clock import Clock
 from kivy.properties import StringProperty, BooleanProperty
 from kivy.uix.screenmanager import Screen
 from kivymd.toast import toast
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.filemanager import MDFileManager
 
 from src import protocol
 from src.conf import BRIDGE_HOST, BRIDGE_PORT
-from src.ml.numpy.datasets import MNIST_PATH
 
 
 class ConfScreen(Screen):
@@ -27,18 +30,25 @@ class ConfScreen(Screen):
         self.connect_btn = "Connect"
         self.join_disabled = True
         self.share_logs = True
+        self.dataset_path = ""
         Clock.schedule_once(self.init, 1)
+        self.file_manager = MDFileManager(
+            select_path=self.select_path,
+            # preview=True,
+        )
 
     def on_request_data(self, checkbox, value):
         if value:
             # print('The checkbox', checkbox, 'is active', 'and', checkbox.state, 'state')
             self.ids.ds_path = ""
             self.ids.ds_label.size_hint_y = None
+            self.ids.ds_label.size_hint_x = None
             self.ids.ds_label.text = ""
             self.request_data = True
         else:
-            self.ds_path = f"[b]USING DATASET AT: [/b] {MNIST_PATH}"
+            self.ds_path = f"Select your dataset folder or file"
             self.ids.ds_label.size_hint_y = 1
+            self.ids.ds_label.size_hint_x = 1
             self.ids.ds_label.text = self.ds_path
             self.request_data = False
 
@@ -51,6 +61,17 @@ class ConfScreen(Screen):
         self.ids.bridge_port.focus = False
         self.ids.request_data.active = self.request_data
         self.ids.share_logs.active = self.share_logs
+
+    def file_manager_open(self):
+        path_root = '/storage/emulated/0/' if platform == 'android' else '/'
+        self.file_manager.show(path_root)
+
+    def select_path(self, path):
+        self.file_manager.close()
+        self.dataset_path = os.path.dirname(path)
+        self.ids.ds_label.text = f"Selected dataset: {self.dataset_path}"
+        self.manager.node.dataset_path = self.dataset_path
+        toast(path)
 
     def connect(self):
         host = self.ids.bridge_host.text

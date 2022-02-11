@@ -25,6 +25,7 @@ class Node(Thread):
         self.port = 0
         self.bridge = None
         self.model = None
+        self.dataset_path = ""
         self.local_model = None
         self.V = {}
         self.current_round = 0
@@ -383,7 +384,7 @@ class Bridge(Thread):
         else:
             ds_duplicate = info.get('ds_duplicate', 1)
             num_users = info.get('num_users', 1)
-            train, val, test, inference = get_local_data(num_users, ds_duplicate)
+            train, val, test, inference = get_local_data(self.device.dataset_path, num_users, ds_duplicate)
             self.device.train = train
             self.device.val = val
             self.device.test = test
