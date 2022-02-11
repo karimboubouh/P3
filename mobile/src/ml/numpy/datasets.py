@@ -40,10 +40,6 @@ class MNIST(object):
     def __load_mnist_train(self, path, kind='train'):
         labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
         images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
-        os.system("pwd")
-        os.system("pwd")
-        os.system("pwd")
-        os.system("pwd")
         with open(labels_path, 'rb') as lbpath:
             magic, n = struct.unpack('>II', lbpath.read(8))
             labels = np.fromfile(lbpath, dtype=np.uint8)
