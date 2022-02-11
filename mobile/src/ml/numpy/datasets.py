@@ -36,32 +36,19 @@ class MNIST(object):
         self.__normalization()
 
     def __load_mnist_train(self, path, kind='train'):
-        labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
-        images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
-        if os.path.isfile(labels_path):
-            print(f"File {labels_path} exists")
-        else:
-            print(f"File {labels_path} is not exidskmkfsmdfkmdkmd")
-        with open(labels_path, 'rb') as lbpath:
-            magic, n = struct.unpack('>II', lbpath.read(8))
-            labels = np.fromfile(lbpath, dtype=np.uint8)
-            print(labels)
-        with open(images_path, 'rb') as imgpath:
-            magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
-            images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+        labels_path = os.path.join(path, '%s_labels.npy' % kind)
+        images_path = os.path.join(path, '%s_images.npy' % kind)
+        # np.save(f"{kind}_labels", labels)
+        labels = np.load(labels_path)
+        images = np.load(images_path).reshape(len(labels), 784)
         self.train_x_set = images
         self.train_labels_set = labels
-        print(labels)
 
     def __load_mnist_test(self, path, kind='t10k'):
-        labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
-        images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
-        with open(labels_path, 'rb') as lbpath:
-            magic, n = struct.unpack('>II', lbpath.read(8))
-            labels = np.fromfile(lbpath, dtype=np.uint8)
-        with open(images_path, 'rb') as imgpath:
-            magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
-            images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+        labels_path = os.path.join(path, '%s_labels.npy' % kind)
+        images_path = os.path.join(path, '%s_images.npy' % kind)
+        labels = np.load(labels_path)
+        images = np.load(images_path).reshape(len(labels), 784)
         self.test_x_set = images
         self.test_labels_set = labels
 
