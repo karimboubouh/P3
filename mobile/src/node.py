@@ -315,7 +315,7 @@ class Bridge(Thread):
                 buffer = b''
                 while len(buffer) < length:
                     to_read = length - len(buffer)
-                    buffer += self.sock.recv(409600000 if to_read > 409600000 else to_read)
+                    buffer += self.sock.recv(4096000 if to_read > 4096000 else to_read)
                     if len(buffer) > 409600:
                         toast(f"Buffer={len(buffer)}")
                 if buffer:
