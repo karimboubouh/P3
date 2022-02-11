@@ -7,6 +7,7 @@ import numpy as np
 
 from src import protocol
 from src import conf
+from src.conf import DATASET_DUPLICATE
 from src.helpers import Map
 from src.utils import log, wait_until, create_tcp_socket, get_ip_address
 
@@ -88,11 +89,10 @@ class Bridge(Thread):
                 'momentum': self.args.momentum, 'gar': self.args.gar, 'frac': self.args.frac}
         info = {'id': i, 'args': args, 'model': model, 'ids': ids, 'clustered': clustered, 'similarity': sim}
         if bridge.request_data:
-            # todo remove
-            data['inference'] = data['test']
-            data['test'] = np.array([])
-            print([len(x) for x in data.values()])
             info['dataset'] = data
+        else:
+            info['num_users'] = self.args.num_users
+            info['ds_duplicate'] = DATASET_DUPLICATE
         bridge.populate(info)
 
         # return DeviceBridge

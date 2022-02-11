@@ -6,10 +6,13 @@ from kivymd.uix.dialog import MDDialog
 
 from src import protocol
 from src.conf import BRIDGE_HOST, BRIDGE_PORT
+from src.ml.numpy.datasets import MNIST_PATH
 
 
 class ConfScreen(Screen):
+    request_data = BooleanProperty()
     connect_logs = StringProperty()
+    ds_path = StringProperty()
     connect_btn = StringProperty()
     join_disabled = BooleanProperty()
 
@@ -20,10 +23,24 @@ class ConfScreen(Screen):
         self.bridge_host = BRIDGE_HOST
         self.bridge_port = BRIDGE_PORT
         self.request_data = True
+        self.ds_path = ""
         self.connect_btn = "Connect"
         self.join_disabled = True
         self.share_logs = True
         Clock.schedule_once(self.init, 1)
+
+    def on_request_data(self, checkbox, value):
+        if value:
+            # print('The checkbox', checkbox, 'is active', 'and', checkbox.state, 'state')
+            self.ids.ds_path = ""
+            self.ids.ds_label.size_hint_y = None
+            self.ids.ds_label.text = ""
+            self.request_data = True
+        else:
+            self.ds_path = f"[b]USING DATASET AT: [/b] {MNIST_PATH}"
+            self.ids.ds_label.size_hint_y = 1
+            self.ids.ds_label.text = self.ds_path
+            self.request_data = False
 
     def init(self, *args):
         self.ids.bridge_host.text = self.bridge_host

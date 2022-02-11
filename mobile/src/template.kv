@@ -101,9 +101,10 @@ ScreenManagement:
                 font_name: "fonts/RobotoM.ttf"
             MDSwitch:
                 id: request_data
-                active: True
+                active: root.request_data
                 color_mode: 'accent'
                 pos_hint: {"center_x": 0.5, "center_y":.5}
+                on_active: root.on_request_data(*args)
         MDSeparator:
         MDBoxLayout:
             orientation: "horizontal"
@@ -119,7 +120,14 @@ ScreenManagement:
                 pos_hint: {"center_x": 0.5, "center_y":.5}
         MDSeparator:
         MDLabel:
-            size_hint: 0.2, 0.2
+            id: ds_label
+            text: root.ds_path
+            markup: True
+            padding: 20, 20
+            theme_text_color: "Custom"
+            text_color: 1, 1, 0, 1
+            size_hint_y: 0.5
+
         MDFillRoundFlatIconButton:
             id: connect_btn
             icon: "vpn"

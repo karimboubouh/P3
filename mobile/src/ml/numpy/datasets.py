@@ -3,13 +3,14 @@ import os
 import struct
 import time
 from random import shuffle
+import src.conf as config
 
 import numpy as np
 from kivymd.toast import toast
 from numpy.random import multinomial
 
-MNIST_PATH = r'./data/mnist/MNIST/raw'
-CIFAR_PATH = r'./data/cifar/CIFAR/raw'
+MNIST_PATH = r'./dataset/mnist/MNIST/raw'
+CIFAR_PATH = r'./dataset/cifar/CIFAR/raw'
 
 
 class MNIST(object):
@@ -39,6 +40,10 @@ class MNIST(object):
     def __load_mnist_train(self, path, kind='train'):
         labels_path = os.path.join(path, '%s-labels-idx1-ubyte' % kind)
         images_path = os.path.join(path, '%s-images-idx3-ubyte' % kind)
+        os.system("pwd")
+        os.system("pwd")
+        os.system("pwd")
+        os.system("pwd")
         with open(labels_path, 'rb') as lbpath:
             magic, n = struct.unpack('>II', lbpath.read(8))
             labels = np.fromfile(lbpath, dtype=np.uint8)
@@ -189,6 +194,29 @@ class MNIST(object):
 
     def __str__(self):
         return f"MNIST/Train={self.train} with {len(self)} samples"
+
+
+def get_local_data(num_users, ds_duplicate):
+    required_samples = int((ds_duplicate * 60000) / num_users)
+    config.DATASET_DUPLICATE = int(np.ceil(ds_duplicate / num_users))
+    print(f"required_samples={required_samples}")
+    print(f"DATASET_DUPLICATE={config.DATASET_DUPLICATE}")
+    train_ds = MNIST(MNIST_PATH, train=True, shuffle=True)
+    test_ds = MNIST(MNIST_PATH, train=False, shuffle=False)
+
+    ratio = config.TRAIN_VAL_TEST_RATIO
+    mask = list(range(required_samples))
+    v1 = int(ratio[0] * len(mask))
+    v2 = int((ratio[0] + ratio[1]) * len(mask))
+    train_mask = mask[:v1]
+    val_mask = mask[v1:v2]
+    test_mask = mask[v2:]
+
+    train_holder = train_ds.slice(train_mask)
+    val_holder = train_ds.slice(val_mask)
+    test_holder = train_ds.slice(test_mask)
+
+    return train_holder, val_holder, test_holder, test_ds
 
 
 def inference_ds(peer, args):

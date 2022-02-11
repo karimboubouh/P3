@@ -16,9 +16,9 @@ if __name__ == '__main__':
     # =================================
     args.mp = 1
     # 10 (sigma=0.4) // 100 (sigma=0.8) // 300 (sigma=0.9)
-    args.num_users = 10
-    args.epochs = 2
-    args.batch_size = 128  # 16
+    args.num_users = 100
+    args.epochs = 10
+    args.batch_size = 60  # 16
     args.iid = 1
     args.unequal = 0
     args.rounds = 500
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=True)
     # set up the network topology
-    topology = random_graph(models, sigma=0.4)
+    topology = random_graph(models, sigma=0.8)
     # include physical edge devices
     edge = edge_devices(args, count=1)
     # build the network graph

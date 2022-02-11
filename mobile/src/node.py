@@ -11,6 +11,7 @@ from kivymd.toast import toast
 from src import protocol
 from src.conf import SOCK_TIMEOUT, TCP_SOCKET_SERVER_LISTEN, ALGORITHM_MODULE
 from src.ml import model_fit, model_inference, train_for_x_epoch, evaluate_model, get_params, set_params
+from src.ml.numpy.datasets import get_local_data
 from src.utils import Map, create_tcp_socket, labels_set, get_ip_address
 
 
@@ -379,6 +380,14 @@ class Bridge(Thread):
             self.device.val = info['dataset']['val']
             self.device.test = info['dataset']['test']
             self.device.inference = info['dataset']['inference']
+        else:
+            ds_duplicate = info.get('ds_duplicate', 1)
+            num_users = info.get('num_users', 1)
+            train, val, test, inference = get_local_data(num_users, ds_duplicate)
+            self.device.train = train
+            self.device.val = val
+            self.device.test = test
+            self.device.inference = inference
         if info.get('args', None):
             self.device.params = Map({
                 'epochs': info['args']['epochs'],
