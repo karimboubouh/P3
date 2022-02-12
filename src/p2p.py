@@ -274,8 +274,6 @@ class NodeConnection(Thread):
                 pass
             except Exception as e:
                 self.terminate = True
-                # todo remove node from list of connected neighbors
-                traceback.print_exc()
                 log('error', f"{self.node} NodeConnection <{self.neighbor_name}> Exception\n{e}")
         self.sock.close()
         log('log', f"{self.node}: neighbor {self.neighbor_name} disconnected")
@@ -533,54 +531,3 @@ class Graph:
 
     def __len__(self):
         return len(self.peers)
-
-
-class IONode:
-
-    def __init__(self, node: Node):
-        # TODO reduce deepcopy instructions
-        self.node = node
-        self.id = node.id
-        self.host = node.host
-        self.port = node.host
-        self.device = node.device
-        self.local_model = deepcopy(node.local_model)
-        self.optimizer = deepcopy(node.optimizer)
-        self.grads = deepcopy(node.grads)
-        self.model = deepcopy(node.model)
-        self.V = node.V
-        self.current_round = node.current_round
-        self.current_exec = node.current_exec
-        self.neighbors_ids = node.neighbors_ids
-        self.neighbors = node.neighbors
-        self.in_neighbors = node.neighbors
-        self.clustered = node.clustered
-        self.similarity = node.similarity
-        self.train = node.train
-        self.val = node.val
-        self.test = node.test
-        self.inference = node.inference
-        self.terminate = node.terminate
-        self.params = node.params
-
-    def train_one_epoch(self, batches=1, evaluate=False):
-        return self.node.train_one_epoch(batches=batches, evaluate=evaluate)
-
-    def connect(self, neighbor: Node):
-        return self.node.connect(neighbor=neighbor)
-
-    def disconnect(self, neighbor_conn: NodeConnection):
-        self.node.disconnect(neighbor_conn=neighbor_conn)
-
-    def broadcast(self, msg, active=None):
-        return self.node.broadcast(msg=msg, active=active)
-
-    def stop(self):
-        self.node.stop()
-
-    # Special methods
-    def __repr__(self):
-        return f"IONode({self.id})"
-
-    def __str__(self):
-        return f"IONode({self.id})"

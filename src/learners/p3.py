@@ -99,7 +99,6 @@ def train_step(peer, t):  # , PSS
         # update and evaluate the model
         if isinstance(T, tqdm):
             T.set_postfix_str(f"{peer} running evaluation in round {t}..." if (t % EVAL_ROUND) == 0 else "")
-        # TODO Review update function
         update_model(peer, w_t, evaluate=(t % EVAL_ROUND == 0))
         # start accepting gradients from next round
         peer.current_round = t + 1
@@ -129,7 +128,6 @@ def collaborativeUpdate(peer, t):
         # peer.params.Wi[j] = max((1 - peer.params.beta) * peer.params.Wi[j] + peer.params.beta * ED, 0)
         # divergence filter
         if ED <= peer.params.delta or True:
-            # todo apply angular filter
             peer.params.n_accept += 1
             accepted.append(w_j)
         else:

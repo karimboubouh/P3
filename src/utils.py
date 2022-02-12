@@ -5,6 +5,7 @@ import time
 from itertools import combinations
 
 import numpy as np
+import pickle
 import torch
 from scipy.spatial import distance
 from termcolor import cprint
@@ -107,7 +108,7 @@ def args_parser():
     parser.add_argument('--stopping_rounds', type=int, default=10,
                         help='rounds of early stopping')
     parser.add_argument('--verbose', type=int, default=2, help='verbose')
-    parser.add_argument('--seed', type=int, default=2, help='random seed')
+    parser.add_argument('--seed', type=int, default=3, help='random seed')
     global args
     args = parser.parse_args()
     return args
@@ -378,6 +379,7 @@ def labels_set(dataset):
 
     return labels
 
+
 # def angular_metric(u, v):
 #     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 #     sim = cos(u, v)
@@ -386,3 +388,17 @@ def labels_set(dataset):
 #     distance = 1 - similarity
 #
 #     return angle, similarity, distance
+
+
+def save(filename, data):
+    unique = np.random.randint(100, 999)
+    filename = f"./out/{filename}_{unique}.pkl"
+    with open(filename, 'wb') as fp:
+        pickle.dump(data, fp)
+        print("Writing to file", filename)
+    return
+
+
+def load(filename):
+    with open(f"./out/{filename}", 'rb') as fp:
+        return pickle.load(fp)

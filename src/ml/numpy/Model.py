@@ -133,7 +133,6 @@ class Model(object):
                 self.__gradient_descent(_g)
 
             if evaluation:
-                # todo add eval loss
                 # print the training log of whole training set rather than batch:
                 t = time.time() - t
                 loss, acc = self.evaluate(self.__val_x_set, self.__val_y_set)

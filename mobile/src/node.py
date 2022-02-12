@@ -384,11 +384,16 @@ class Bridge(Thread):
         else:
             ds_duplicate = info.get('ds_duplicate', 1)
             num_users = info.get('num_users', 1)
-            train, val, test, inference = get_local_data(self.device.dataset_path, num_users, ds_duplicate)
-            self.device.train = train
-            self.device.val = val
-            self.device.test = test
-            self.device.inference = inference
+            try:
+                train, val, test, inference = get_local_data(self.device.dataset_path, num_users, ds_duplicate)
+                self.device.train = train
+                self.device.val = val
+                self.device.test = test
+                self.device.inference = inference
+            except MemoryError as e:
+                toast(f"MemoryError:  {e}")
+            except Exception as e:
+                toast(f"Exception:  {e}")
         if info.get('args', None):
             self.device.params = Map({
                 'epochs': info['args']['epochs'],

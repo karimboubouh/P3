@@ -177,7 +177,7 @@ class MNIST(object):
         return batches
 
     def slice(self, index):
-        new_self = copy.deepcopy(self)
+        new_self = copy.copy(self)
         if self.train in [None, True]:
             new_self.train_x_set = self.train_x_set[index]
             new_self.train_y_set = self.train_y_set[index]

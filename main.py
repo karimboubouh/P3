@@ -8,17 +8,17 @@ from src.ml import initialize_models
 from src.network import random_graph, network_graph
 from src.p2p import Graph
 from src.plots import plot_train_history
-from src.utils import exp_details, load_conf, fixed_seed, log
+from src.utils import exp_details, load_conf, fixed_seed, log, save, load
 
 if __name__ == '__main__':
     # load experiment configuration from CLI arguments
     args = load_conf()
     # =================================
-    args.mp = 1
-    # 10 (sigma=0.4) // 100 (sigma=0.8) // 300 (sigma=0.9)
-    args.num_users = 10
+    args.mp = 0
+    # 10 (sigma=0.4) // 100 (sigma=0.9) // 300 (sigma=0.95)
+    args.num_users = 100
     args.epochs = 10
-    args.batch_size = 60  # 16
+    args.batch_size = 128
     args.iid = 1
     args.unequal = 0
     args.rounds = 500
@@ -37,19 +37,20 @@ if __name__ == '__main__':
     # build users models
     models = initialize_models(args, same=True)
     # set up the network topology
-    topology = random_graph(models, sigma=0.4)
-    # include physical edge devices
-    edge = edge_devices(args, count=1)
+    topology = random_graph(models, sigma=0.9)
+    # include physical edge devices  (count < 1 to only use simulated nodes)
+    edge = edge_devices(args, count=-1)
     # build the network graph
     graph = network_graph(topology, models, train_ds, test_ds, user_groups, args, edge=edge)
     graph.show_neighbors()
     # graph.show_similarity(ids=True)
 
     # Phase I: Local Training
-    train_logs = graph.local_training(inference=True)
+    train_logs = graph.local_training(inference=False)
 
     # Phase II: Collaborative training
     collab_logs = graph.collaborative_training(learner=p3, args=args)
-    # info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
-    # plot_train_history(collab_logs, metric='accuracy', measure="mean")
+    save(f"collab_log_{args.num_users}_{args.epochs}", collab_logs)
+    info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
+    plot_train_history(collab_logs, metric='accuracy', measure="mean")
     print("END.")

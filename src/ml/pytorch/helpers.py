@@ -85,7 +85,6 @@ def train_for_x_epoch(peer, batches=1, evaluate=False):
         optimizer = peer.params.opt_func(peer.model.parameters(), peer.params.lr)
         loss = peer.model.train_step(batch, peer.device)
         loss.backward()
-        # TODO new verify
         optimizer.step()
         optimizer.zero_grad()
         # get gradients
