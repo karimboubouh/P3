@@ -50,7 +50,7 @@ def args_parser():
     parser = argparse.ArgumentParser()
 
     # federated arguments (Notation for the arguments followed from paper)
-    parser.add_argument('--rounds', type=int, default=100,
+    parser.add_argument('--rounds', type=int, default=500,
                         help="number of rounds of training")
     parser.add_argument('--num_users', type=int, default=100,
                         help="number of users: K")
@@ -59,9 +59,9 @@ def args_parser():
     parser.add_argument('--gar', type=str, default='average',
                         help='Gradient Aggregation rule to use: \
                          average, median, krum, aksel')
-    parser.add_argument('--epochs', type=int, default=10,
+    parser.add_argument('--epochs', type=int, default=2,
                         help="the number of local epochs: E")
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=64,
                         help="batch size: B")
     parser.add_argument('--lr', type=float, default=0.1,
                         help='learning rate')

@@ -1,25 +1,20 @@
-import os
-import time
-
 from src.edge_device import edge_devices
-from src.ml import get_dataset
 from src.learners import p3
+from src.ml import get_dataset
 from src.ml import initialize_models
 from src.network import random_graph, network_graph
-from src.p2p import Graph
 from src.plots import plot_train_history
-from src.utils import exp_details, load_conf, fixed_seed, log, save, load
+from src.utils import exp_details, load_conf, fixed_seed, save
 
 if __name__ == '__main__':
     # load experiment configuration from CLI arguments
     args = load_conf()
     # =================================
-    args.mp = 0
-    # 10 (sigma=0.4) // 100 (sigma=0.9) // 300 (sigma=0.95)
+    args.mp = 1
     args.num_users = 100
-    args.epochs = 10
+    args.epochs = 2
     args.batch_size = 128
-    args.iid = 1
+    args.iid = 0
     args.unequal = 0
     args.rounds = 500
     # =================================
@@ -36,8 +31,8 @@ if __name__ == '__main__':
     train_ds, test_ds, user_groups = get_dataset(args)
     # build users models
     models = initialize_models(args, same=True)
-    # set up the network topology
-    topology = random_graph(models, sigma=0.9)
+    # set up the network topology || 10 (sigma=0.4) // 100 (sigma=0.9) // 300 (sigma=0.95)
+    topology = random_graph(models, sigma=0.8)
     # include physical edge devices  (count < 1 to only use simulated nodes)
     edge = edge_devices(args, count=-1)
     # build the network graph
