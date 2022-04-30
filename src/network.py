@@ -14,8 +14,23 @@ from src.p2p import Node, Graph
 from src.utils import cluster_peers, similarity_matrix, node_topology, log
 
 
-def random_graph(models, sigma=0.2, cluster_enabled=False, k=2, data=None):
-    if sigma and sigma < 0:
+def central_graph(models):
+    nb_nodes = len(models)
+    similarities = np.zeros((nb_nodes, nb_nodes))
+    similarities[nb_nodes - 1] = similarities.T[nb_nodes - 1] = 1
+    similarities[nb_nodes - 1][nb_nodes - 1] = 0
+    adjacency = similarities != 0
+    clusters = {0: np.arange(nb_nodes)}
+
+    return {
+        'clusters': clusters,
+        'similarities': similarities,
+        'adjacency': adjacency
+    }
+
+
+def random_graph(models, rho=0.2, cluster_enabled=False, k=2, data=None):
+    if rho and rho < 0:
         log('warning', f"Generating a negative similarity matrix.")
     # prob_edge = 1, rnd_state = None
     nb_nodes = len(models)
@@ -24,9 +39,9 @@ def random_graph(models, sigma=0.2, cluster_enabled=False, k=2, data=None):
     else:
         clusters = {0: np.arange(nb_nodes)}
     if data:
-        adjacency, similarities = similarity_matrix(models, clusters, sigma, data=data)
+        adjacency, similarities = similarity_matrix(models, clusters, rho, data=data)
     else:
-        adjacency, similarities = similarity_matrix(nb_nodes, clusters, sigma, data=data)
+        adjacency, similarities = similarity_matrix(nb_nodes, clusters, rho, data=data)
 
     return {
         'clusters': clusters,

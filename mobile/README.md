@@ -14,4 +14,10 @@ Then build the application:
 buildozer android debug deploy run
 ```
 
+## Screenshots
+
+
+
+<img src="https://tva1.sinaimg.cn/large/e6c9d24egy1h1s1z4yldpj20gf0zk0te.jpg" alt="IMAGE 2022-04-30 13:08:54" style="zoom:50%;" />       <img src="https://tva1.sinaimg.cn/large/e6c9d24egy1h1s1zm1d2cj20gf0zk757.jpg" alt="IMAGE 2022-04-30 13:09:32" style="zoom:50%;" />
+
 End.

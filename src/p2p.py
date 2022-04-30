@@ -19,7 +19,7 @@ from src.measure_energy import measure_energy
 from src.ml import get_dataset, train_val_test, inference_ds, evaluate_model, get_params, set_params, train_for_x_epoch
 from src.ml import initialize_models, model_fit, model_inference
 from src.profiler import profiler
-from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_ip_address
+from src.utils import optimizer_func, log, create_tcp_socket, labels_set, get_ip_address, elog
 
 
 class Node(Thread):
@@ -68,22 +68,23 @@ class Node(Thread):
         self._init_server()
 
     def run(self):
-        while not self.terminate:
-            try:
-                conn, address = self.sock.accept()
-                if not self.terminate:
-                    neighbor_conn = NodeConnection(self, address[1], conn)
-                    neighbor_conn.start()
-                    self.neighbors.append(neighbor_conn)
-                    # self.in_neighbors.append(in_neighbor_conn)
-            except socket.timeout:
-                pass
-            except Exception as e:
-                log('error', f"{self}: Node Exception\n{e}")
+        if self.mp:
+            while not self.terminate:
+                try:
+                    conn, address = self.sock.accept()
+                    if not self.terminate:
+                        neighbor_conn = NodeConnection(self, address[1], conn)
+                        neighbor_conn.start()
+                        self.neighbors.append(neighbor_conn)
+                        # self.in_neighbors.append(in_neighbor_conn)
+                except socket.timeout:
+                    pass
+                except Exception as e:
+                    log('error', f"{self}: Node Exception\n{e}")
 
-        for neighbor in self.neighbors:
-            neighbor.stop()
-        self.sock.close()
+            for neighbor in self.neighbors:
+                neighbor.stop()
+            self.sock.close()
         log('log', f"{self}: Stopped")
 
     def connect(self, neighbor: Node):
@@ -123,7 +124,8 @@ class Node(Thread):
         for neighbor in self.neighbors:
             self.disconnect(neighbor)
         self.terminate = True
-        self.sock.close()
+        if self.mp:
+            self.sock.close()
 
     def send(self, neighbor, msg):
         neighbor.send(msg)
@@ -222,11 +224,14 @@ class Node(Thread):
         pass
 
     def _init_server(self):
-        self.sock = create_tcp_socket()
-        self.sock.bind((self.host, self.port))
-        self.sock.settimeout(SOCK_TIMEOUT)
-        self.sock.listen(TCP_SOCKET_SERVER_LISTEN)
-        self.port = self.sock.getsockname()[1]
+        if self.mp:
+            self.sock = create_tcp_socket()
+            self.sock.bind((self.host, self.port))
+            self.sock.settimeout(SOCK_TIMEOUT)
+            self.sock.listen(TCP_SOCKET_SERVER_LISTEN)
+            self.port = self.sock.getsockname()[1]
+        else:
+            self.sock = None
 
     # Special methods
     def __repr__(self):
@@ -300,7 +305,6 @@ class NodeConnection(Thread):
         except Exception as e:
             print(self)
             print(self.node)
-            print(data)
             print(self.node.params)
             exit()
         if self.node.current_round <= data['t']:
@@ -330,7 +334,7 @@ class NodeConnection(Thread):
 class NodeLink:
     def __init__(self, node: Node, neighbor: Node, link: NodeLink = None):
         self.node = node
-        self.neighbor = neighbor
+        self.neighbor: Node = neighbor
         self.link = link
         # kept for compatibility with NodeConnection
         self.terminate = False
@@ -400,7 +404,6 @@ class Graph:
         args.num_users = 1
         args.iid = 1
         args.unequal = 0
-        args.iid = 1
         args.rounds = 0
         train_ds, test_ds, user_groups = get_dataset(args)
         train, val, test = train_val_test(train_ds, user_groups[0], args)
@@ -428,7 +431,7 @@ class Graph:
                 labels = labels_set(peer.train)
                 log('info',
                     f"{peer} is performing local training on {len(peer.train.dataset)} samples of labels {labels}.")
-            histories[peer] = peer.fit(inference)
+            histories[peer.id] = peer.fit(inference)
             # peer.stop()
         t = time.time() - t
         log("success", f"Local training finished in {t:.2f} seconds.")

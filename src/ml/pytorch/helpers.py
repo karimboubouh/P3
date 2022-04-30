@@ -79,7 +79,7 @@ def model_fit(peer):
 
 def train_for_x_epoch(peer, batches=1, evaluate=False):
     for i in range(batches):
-        # train for single batch randomly chosen when Dataloader is set with shuffle=True
+        # train for x batches randomly chosen when Dataloader is set with shuffle=True
         batch = next(iter(peer.train))
         # execute one training step
         optimizer = peer.params.opt_func(peer.model.parameters(), peer.params.lr)
@@ -88,10 +88,11 @@ def train_for_x_epoch(peer, batches=1, evaluate=False):
         optimizer.step()
         optimizer.zero_grad()
         # get gradients
-        grads = []
-        for param in peer.model.parameters():
-            grads.append(param.grad.view(-1))
-        peer.grads = torch.cat(copy.deepcopy(grads))
+        # TODO review store gradients in "peer.grads"
+        # grads = []
+        # for param in peer.model.parameters():
+        #     grads.append(param.grad.view(-1))
+        # peer.grads = torch.cat(copy.deepcopy(grads))
     if evaluate:
         return peer.model.evaluate(peer.val, peer.device)
 

@@ -72,6 +72,11 @@ def model_fit(peer):
 
 
 def train_for_x_epoch(peer, batches=1, evaluate=False):
+    # TODO improve FedAvg for numpy
+    if peer.model.has_no_data():
+        peer.model.train(peer.train.dataset, peer.train.targets)
+        peer.model.val(peer.val.dataset, peer.val.targets)
+        peer.model.test(peer.test.dataset, peer.test.targets)
     return peer.model.improve(batches, evaluate)
 
 
@@ -85,7 +90,7 @@ def model_inference(peer, one_batch=False):
     loss, acc = peer.model.evaluate(peer.inference.dataset, peer.inference.targets, one_batch)
     o = "1B" if one_batch else "*B"
     t = time.time() - t
-    log('result', f"Node {peer.id} [{t:.2f}s] {o} Inference loss: {loss:.4f},  acc: {(acc * 100):.2f}%")
+    log('result', f"{peer} [{t:.2f}s] {o} Inference loss: {loss:.4f},  acc: {(acc * 100):.2f}%")
 
 
 def get_params(model, named=False, numpy=None):

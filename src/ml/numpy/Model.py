@@ -57,6 +57,11 @@ class Model(object):
         self.__test_x_set = test_x_set
         self.__test_y_set = test_y_set
 
+    def has_no_data(self):
+        no_train = self.__train_x_set is None or self.__train_y_set is None
+        no_test = self.__test_x_set is None or self.__test_y_set is None
+        return no_train or no_test
+
     def print_structure(self):
         for i in range(len(self.__layer_name_lst)):
             print("{}:Layer[{}] Output Dim={}".format(self.name,
@@ -77,6 +82,7 @@ class Model(object):
         for layer_block in self.__layer_block_dct.values():
             if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):
                 params.extend(layer_block.get_weights().values())
+
         return params
 
     @parameters.setter
@@ -151,6 +157,9 @@ class Model(object):
         :param evaluation: evaluate model using eval set
         :return: none
         """
+        if self.__train_x_set is None:
+            print("None data improve!")
+            exit(1)
         _vg = {}  # change to an init function
         for layer_name, layer_block in zip(self.__layer_block_dct.keys(), self.__layer_block_dct.values()):
             if isinstance(layer_block, (Conv2D, Dense, BasicRNN)):

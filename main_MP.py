@@ -1,5 +1,5 @@
 from src.edge_device import edge_devices
-from src.learners import sp3
+from src.learners import mp
 from src.ml import get_dataset
 from src.ml import initialize_models
 from src.network import random_graph, network_graph
@@ -11,21 +11,21 @@ if __name__ == '__main__':
     args = load_conf()
     # =================================
     args.mp = 0
-    args.epochs = 2
-    args.iid = 0
+    args.epochs = 10
+    args.iid = 1
     args.unequal = 0
     args.num_users = 100
-    args.rounds = 500
+    args.rounds = 400
     # =================================
-    fixed_seed(True)
+    fixed_seed(False)
     # print experiment details
     exp_details(args)
     # load dataset and initialize user groups
     train_ds, test_ds, user_groups = get_dataset(args)
     # build users models
     models = initialize_models(args, same=True)
-    # set up the network topology || 10 (sigma=0.4) // 100 (sigma=0.9) // 300 (sigma=0.95)
-    topology = random_graph(models, rho=0.3)  # 1, 0.6, 0.3, 0.05, 0.01
+    # set up the network topology
+    topology = random_graph(models, rho=0.3)
     # include physical edge devices  (count < 1 to only use simulated nodes)
     edge = edge_devices(args, count=-1)
     # build the network graph
@@ -34,11 +34,11 @@ if __name__ == '__main__':
     # graph.show_similarity(ids=False)
 
     # Phase I: Local Training
-    graph.local_training(inference=False)
-
+    train_logs = graph.local_training(inference=True)
     # Phase II: Collaborative training
-    train_logs = graph.collaborative_training(learner=sp3, args=args)
-    save(f"p3_log_{args.num_users}_{args.epochs}", train_logs)
+    collab_logs = graph.collaborative_training(learner=mp, args=args)
     info = {'xlabel': "Rounds", 'title': "Accuracy. vs. No. of rounds"}
-    plot_train_history(train_logs, metric='accuracy', measure="mean-std")
+    logs = {pid: train_logs[pid] + collab_logs[pid] for pid in train_logs.keys()}
+    save(f"mp_log_{args.num_users}_{args.epochs}", logs)
+    plot_train_history(logs, metric='accuracy', measure="mean-std")
     print("END.")

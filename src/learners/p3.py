@@ -13,7 +13,7 @@ from src.filters import angular_metric
 from src.p2p import Graph, Node
 from src.utils import log, active_peers, wait_until, get_node_conn_by_id
 
-name = "P3 Algorithm"
+name = "Personalized P2P (P3)"
 
 
 # ---------- MAlgorithm functions ----------------------------------------------

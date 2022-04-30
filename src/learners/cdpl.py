@@ -5,7 +5,7 @@ from src.conf import RECORD_RATE
 from src.p2p import Graph
 from src.utils import log
 
-name = "Model Propagation Learner"
+name = "Contribution Driven P2P Learning (CDPL)"
 
 
 def collaborate(graph: Graph, device='cpu'):

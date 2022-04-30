@@ -1,6 +1,6 @@
 # On the Energy Efficiency of P2P Personalized Machine Learning using Mobile Devices
 
-This repository contains the code to run simulations for the "*On the Energy Efficiency of P2P Personalized Machine Learning using Mobile Devices*" paper, submitted in *ACM e-Energy 2022* conference.
+This repository contains the code to run simulations for the "*On the Advantages of P2P ML on Mobile Devices*" paper, submitted in *ACM e-Energy 2022* conference.
 The repository includes the implementation of the P3 algorithm on a simulated environment, and the implementation of the P3 algorithm on Android.
 
 ### Requirements
@@ -29,11 +29,11 @@ ML_ENGINE = "PyTorch"  # "NumPy" or "PyTorch"
 
 ### Configuration
 
-To build the random topology of the P2P network, we use the graph density parameter `sigma` to estimate the number of neighbors for each nodes. In our experiments, we use the following:
+To build the random topology of the P2P network, we use the graph density parameter `rho` to estimate the number of neighbors for each nodes. In our experiments, we use the following:
 
-- For 10 peers: `sigma=0.4`
-- For 100 peers: `sigma=0.8`
-- For 300 peers: `sigma=0.95`
+- For 10 peers: `rho=0.4`
+- For 100 peers: `rho=0.8`
+- For 300 peers: `rho=0.95`
 
 The main algorithm parameters are the following:
 
@@ -51,7 +51,7 @@ The main algorithm parameters are the following:
 | --iid        | Data distribution, default set to IID. Set to 0 for non-IID.                      |
 | --unequal    | Whether to use unequal data splits for non-i.i.d setting (use 0 for equal splits) |
 
-### Execution of P3
+### Execution of Personalized P2P (P3)
 
 To reproduce the experiments of model performance in the paper use the following command:
 
@@ -67,14 +67,36 @@ To reproduce the experiments of model performance in the paper use the following
 
 `python main.py --num_users=100 --model=mlp --dataset=mnist --iid=0 --unequal=1 --round=500`
 
+- Network density:
+
+Change the values of parameter $\rho$
+
+```python
+topology = random_graph(models, rho=0.95)  # 0, 0.4, 0.7, 0.95, 0.99
+```
+
+
+
+### Execution of Centralized Learning (CL)
+
+`python main_CL.py--model=mlp --dataset=mnist`
+
+### Execution of Model Propagation (MP)
+
+`python main_MP.py --num_users=100 --model=mlp --dataset=mnist --iid=1 --round=500`
+
+### Execution of FedAvg (FL)
+
+`python main_FL.py --num_users=100 --model=mlp --dataset=mnist --iid=1 --round=500`
+
 ## Energy Analysis
 
-To perform energy analysis of P3 on the server (Ubuntu 20.04), we developed two methods of energy readings:
+To perform energy analysis of P3 on the Linux server (Ubuntu 20.04), we developed two methods of energy readings:
 
 - Evaluating the whole program by running the `run.sh` script.
 - Evaluating a given method of the algorithm using python decorators.
 
-**NB:** you need to disable virtualization from the bios as we shield the program to one single core.
+**NB:** you need to disable virtualization from the bios as we shield the program to one physical core.
 
 ### Requirement
 

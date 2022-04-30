@@ -1,14 +1,16 @@
 import argparse
+import pickle
 import random
 import socket
 import time
+from inspect import getframeinfo, currentframe
 from itertools import combinations
 
 import numpy as np
-import pickle
 import torch
 from scipy.spatial import distance
 from termcolor import cprint
+from torch import linalg as LA
 
 from src import conf
 from src.conf import ML_ENGINE, TCP_SOCKET_BUFFER_SIZE
@@ -49,11 +51,11 @@ def exp_details(args):
 def args_parser():
     parser = argparse.ArgumentParser()
 
-    # federated arguments (Notation for the arguments followed from paper)
     parser.add_argument('--rounds', type=int, default=500,
                         help="number of rounds of training")
     parser.add_argument('--num_users', type=int, default=100,
                         help="number of users: K")
+    parser.add_argument('--model', type=str, default='mlp', help='model name')
     parser.add_argument('--frac', type=float, default=1,
                         help='the fraction of active neighbors')
     parser.add_argument('--gar', type=str, default='average',
@@ -67,26 +69,6 @@ def args_parser():
                         help='learning rate')
     parser.add_argument('--momentum', type=float, default=0.9,
                         help='SGD momentum (default: 0.9)')
-
-    # model arguments
-    parser.add_argument('--model', type=str, default='mlp', help='model name')
-    parser.add_argument('--kernel_num', type=int, default=9,
-                        help='number of each kind of kernel')
-    parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
-                        help='comma-separated kernel size to \
-                        use for convolution')
-    parser.add_argument('--num_channels', type=int, default=1, help="number \
-                        of channels of imgs")
-    parser.add_argument('--norm', type=str, default='batch_norm',
-                        help="batch_norm, layer_norm, or None")
-    parser.add_argument('--num_filters', type=int, default=32,
-                        help="number of filters for conv nets -- 32 for \
-                        mini-imagenet, 64 for imagenet.")
-    parser.add_argument('--max_pool', type=str, default='True',
-                        help="Whether use max pooling rather than \
-                        strided convolutions")
-
-    # other arguments
     parser.add_argument('--mp', type=int, default=1,
                         help='Use message passing (MP) via sockets or shared \
                         memory (SM). Default set to MP. Set to 0 for SM.')
@@ -105,8 +87,6 @@ def args_parser():
     parser.add_argument('--unequal', type=int, default=0,
                         help='whether to use unequal data splits for  \
                         non-i.i.d setting (use 0 for equal splits)')
-    parser.add_argument('--stopping_rounds', type=int, default=10,
-                        help='rounds of early stopping')
     parser.add_argument('--verbose', type=int, default=2, help='verbose')
     parser.add_argument('--seed', type=int, default=3, help='random seed')
     global args
@@ -143,7 +123,7 @@ def log(mtype, message):
                 cprint("\r Result:  ", 'blue', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", 'blue', end=' ')
-            cprint(message, 'blue')
+            cprint(str(message), 'blue')
             log.old_type = 'result'
             return
     if args.verbose > -1:
@@ -152,7 +132,7 @@ def log(mtype, message):
                 cprint("\r Error:   ", 'red', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", 'red', end=' ')
-            cprint(message, 'red')
+            cprint(str(message), 'red')
             log.old_type = 'error'
             return
         elif mtype == "success":
@@ -160,7 +140,7 @@ def log(mtype, message):
                 cprint("\r Success: ", 'green', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", 'green', end=' ')
-            cprint(message, 'green')
+            cprint(str(message), 'green')
             log.old_type = 'success'
             return
     if args.verbose > 0:
@@ -169,7 +149,7 @@ def log(mtype, message):
                 cprint("\r Event:   ", 'cyan', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", 'cyan', end=' ')
-            cprint(message, 'cyan')
+            cprint(str(message), 'cyan')
             log.old_type = 'event'
             return
         elif mtype == "warning":
@@ -177,7 +157,7 @@ def log(mtype, message):
                 cprint("\r Warning: ", 'yellow', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", 'yellow', end=' ')
-            cprint(message, 'yellow')
+            cprint(str(message), 'yellow')
             log.old_type = 'warning'
             return
     if args.verbose > 1:
@@ -186,7 +166,7 @@ def log(mtype, message):
                 cprint("\r Info:    ", attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", end=' ')
-            cprint(message)
+            cprint(str(message))
             log.old_type = 'info'
             return
     if args.verbose > 2:
@@ -195,7 +175,17 @@ def log(mtype, message):
                 cprint("\r Log:     ", 'magenta', attrs=['reverse'], end=' ', flush=True)
             else:
                 cprint("          ", end=' ')
+            cprint(str(message))
             log.old_type = 'log'
+
+
+def elog(message, mtype="log"):
+    frameinfo = getframeinfo(currentframe().f_back)
+    filename = frameinfo.filename.split('/')[-1]
+    linenumber = frameinfo.lineno
+    info = 'File: %s, line: %d' % (filename, linenumber)
+    log(mtype, message)
+    exit()
 
 
 # def partition(x, nb_nodes, cluster_data=True, method="random", random_state=None):
@@ -235,13 +225,13 @@ def cluster_peers(nb_nodes, k):
     return clusters
 
 
-def similarity_matrix(mask, clusters, sigma=0.2, data=None):
+def similarity_matrix(mask, clusters, rho=0.2, data=None):
     """Compute the similarity matrix randomly or according to users data"""
     if isinstance(mask, int):
-        random = True
+        randm = True
         nb_nodes = mask
     else:
-        random = False
+        randm = False
         nb_nodes = len(mask)
     combi = combinations(range(nb_nodes), 2)
     pairs = []
@@ -252,7 +242,7 @@ def similarity_matrix(mask, clusters, sigma=0.2, data=None):
     similarities = np.zeros((nb_nodes, nb_nodes))
     # calculate similarity matrix
     for p in pairs:
-        if random:
+        if randm:
             similarities[p] = similarities.T[p] = np.random.uniform(-1, 1)
         else:
             mask1 = np.sort(mask[p[0]])
@@ -261,12 +251,18 @@ def similarity_matrix(mask, clusters, sigma=0.2, data=None):
             vec2 = data.targets[mask2].numpy()
             similarities[p] = similarities.T[p] = 1 - distance.cosine(vec1, vec2)
     # apply similarity threshold
-    if sigma is not None:
-        similarities[similarities < sigma] = 0
-        for i, s in enumerate(similarities):
-            if np.all(np.logical_not(s)):
-                log('error', f"The generated Random Graph is disconnected [sigma={sigma}], Node({i}) has 0 neighbors.")
-                exit(0)
+    if rho is not None:
+        sim_vals = similarities.copy()
+        similarities[similarities < rho] = 0
+        for i, sim in enumerate(similarities):
+            if np.all(np.logical_not(sim)):
+                if len(sim) > 0:
+                    neighbor_id = random.choice(range(len(sim)))
+                    sim[neighbor_id] = round(abs(sim_vals[i][neighbor_id]), 2)
+                    log('warning', f"Node({i}) was attributed one peer: Node({neighbor_id}) with W={sim[neighbor_id]}")
+                else:
+                    log('error', f"The generated Random Graph is disconnected [s={rho}], Node({i}) has 0 neighbors.")
+                    exit(0)
 
     # get adjacency matrix
     adjacency = similarities != 0
@@ -302,7 +298,7 @@ def verify_metrics(_metric, _measure):
     else:
         metric = f"{conf.DEFAULT_VAL_DS}_loss"
 
-    if _measure not in ['mean', 'max', 'std']:
+    if _measure not in ['mean', 'mean-std', 'max', 'std']:
         log("error", f"Unknown {_metric} measure: {_measure}")
         log("", f"Set measure to default: mean")
         measure = "mean"
@@ -336,7 +332,7 @@ def wait_until(predicate, timeout=2, period=0.2, *args_, **kwargs):
         if predicate(*args_, **kwargs):
             return True
         time.sleep(period)
-    log("log", f"{predicate} finished after {time.time() - start_time} seconds.")
+    log("error", f"{predicate} finished after {time.time() - start_time} seconds.")
     return False
 
 
@@ -400,5 +396,14 @@ def save(filename, data):
 
 
 def load(filename):
-    with open(f"./out/{filename}", 'rb') as fp:
+    with open(f"../out/{filename}", 'rb') as fp:
         return pickle.load(fp)
+
+
+def norm_squared(vi, vj):
+    if ML_ENGINE == "PyTorch":
+        return LA.norm(vi - vj).item() ** 2
+    else:
+        fvi = np.concatenate([x.ravel() for x in vi])
+        fvj = np.concatenate([x.ravel() for x in vj])
+        return np.linalg.norm(fvi - fvj) ** 2
