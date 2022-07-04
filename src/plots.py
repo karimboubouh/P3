@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 from src import conf
 from src.conf import EVAL_ROUND
 from src.helpers import Map
@@ -98,7 +101,7 @@ def plot_manymore(exps, metric='accuracy', measure="mean", info=None, save=False
     plt.ylabel(ylabel, fontsize=13)
     plt.xlabel(xlabel, fontsize=13)
     colors = ['green', 'blue', 'orange', 'black', 'red', 'grey', 'tan', 'pink', 'navy', 'aqua']
-    colors = ['black', 'green', 'orange', 'blue', 'red', 'grey', 'tan', 'pink', 'navy', 'aqua']
+    # colors = ['black', 'green', 'orange', 'blue', 'red', 'grey', 'tan', 'pink', 'navy', 'aqua']
     line_styles = ['-', '--', '-.', '-', '--', '-.', ':', '-', '--', '-.', ':']
     plt.grid(linestyle='dashed')
     plt.rc('legend', fontsize=12)
@@ -121,12 +124,12 @@ def plot_manymore(exps, metric='accuracy', measure="mean", info=None, save=False
         x = range(0, len(data) * EVAL_ROUND, EVAL_ROUND)
         plt.plot(x, data, color=colors[i], label=name, linestyle=line_styles[i])
         if std_data is not None:
-            plt.fill_between(x, data - std_data, data + std_data, color=colors[i], alpha=.05)
+            plt.fill_between(x, data - std_data, data + std_data, color=colors[i], alpha=.1)
 
     plt.legend(loc="lower right", shadow=True)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    # plt.yticks(np.arange(0, 1.1, 0.2))
+    plt.yticks(np.arange(0, 1.1, 0.2))
     plt.title(title)
     if save:
         unique = np.random.randint(100, 999)
@@ -135,8 +138,77 @@ def plot_manymore(exps, metric='accuracy', measure="mean", info=None, save=False
 
 
 if __name__ == '__main__':
-    # plot_train_history("PT_FL_IID_100_1_500.pkl", metric='accuracy', measure="mean-std")
-    # exit()
+    plot_manymore([
+        {'file': "PT_P3_U_100_0_500.pkl", 'name': "P3, $e = 0$"},
+        {'file': "PT_P3_U_100_2_500.pkl", 'name': "P3, $e = 2$"},
+        {'file': "PT_P3_U_100_10_500.pkl", 'name': "P3, $e = 10$"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy over all peers", 'title': ""}, save=True)
+
+
+"""
+-------------------------------------------------
+EXP: 1
+-------------------------------------------------
+    plot_manymore([
+        {'file': "PT_P3_IID_100_0_500.pkl", 'name': "P3, $e = 0$"},
+        {'file': "PT_P3_IID_100_2_500.pkl", 'name': "P3, $e = 2$"},
+        {'file': "PT_P3_IID_100_10_500.pkl", 'name': "P3, $e = 10$"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy over all peers", 'title': ""}, save=True)
+"""
+
+"""
+-------------------------------------------------
+EXP: 2
+-------------------------------------------------
+    plot_manymore([
+        {'file': "PT_P3_NIID_100_0_500.pkl", 'name': "P3, $e = 0$"},
+        {'file': "PT_P3_NIID_100_2_500.pkl", 'name': "P3, $e = 2$"},
+        {'file': "PT_P3_NIID_100_10_500.pkl", 'name': "P3, $e = 10$"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy over all peers", 'title': ""}, save=True)
+"""
+
+"""
+-------------------------------------------------
+EXP: 3
+-------------------------------------------------
+    plot_manymore([
+        {'file': "PT_P3_U_100_0_500.pkl", 'name': "P3, $e = 0$"},
+        {'file': "PT_P3_U_100_2_500.pkl", 'name': "P3, $e = 2$"},
+        {'file': "PT_P3_U_100_10_500.pkl", 'name': "P3, $e = 10$"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy over all peers", 'title': ""}, save=True)
+"""
+
+"""
+-------------------------------------------------
+EXP: 4
+-------------------------------------------------
+    plot_manymore([
+        {'file': "PT_P3_IID_100_2_500.pkl", 'name': "P3$_{\\bf{Server}}$ (all peers)"},
+        {'file': "PT_P3_MOB_100_2_500.pkl", 'name': "P3$_{\\bf{Mobile}}$ (one device)"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy", 'title': ""}, save=True)
+"""
+
+"""
+-------------------------------------------------
+EXP: 5
+-------------------------------------------------
+    plot_manymore([
+        {'file': "PT_P3_IID_100_2_500.pkl", 'name': r"P3 $_{(P2P)}$"},
+        {'file': "PT_MP_IID_100_10_500.pkl", 'name': r"MP $_{(P2P)}$"},
+        {'file': "PT_FL_IID_100_1_500.pkl", 'name': r"FedAvg $_{(FL)}$"},
+    ], metric="accuracy", measure="mean-std",
+        info={'xlabel': "iterations", 'ylabel': "Test Accuracy", 'title': ""}, save=True)
+"""
+
+"""
+-------------------------------------------------
+EXP: 6
+-------------------------------------------------
     plot_manymore([
         {'file': "MP_100_2_W_0.pkl", 'name': r"$\rho = 1$"},
         {'file': "MP_100_2_W_0.33.pkl", 'name': r"$\rho = 0.6$"},
@@ -145,3 +217,4 @@ if __name__ == '__main__':
         {'file': "MP_100_2_W_0.99.pkl", 'name': r"$\rho = 0.01$"},
     ], metric="accuracy", measure="mean-std",
         info={'xlabel': "iterations", 'ylabel': "Test Accuracy", 'title': ""}, save=True)
+"""
